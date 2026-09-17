@@ -7,13 +7,15 @@ const core = setupCore({ component: components.auth });
 
 export const { signOut, refreshSession, isAuthenticated } = core;
 
-export const { signUpWithPassword, signInWithPassword } =
-  setupUsernamePassword(core, {
+export const { signUpWithPassword, signInWithPassword } = setupUsernamePassword(
+  core,
+  {
     component: components.authPasswordProvider,
     usernameComponent: components.authUsername,
-  }).attachUserCallbacks({ createUser: internal.users.createUserPassword });
+  },
+).attachUserCallbacks({ createUser: internal.users.createUserPassword });
 
 export const { startSignInGithub, completeSignInGithub } = setupGithub(core, {
   component: components.oauthGithub,
-  allowedRedirectOrigins: ["http://localhost:5173"],
+  allowedRedirectOrigins: ["http://localhost:5173", "http://127.0.0.1:5173"],
 }).attachUserCallbacks({ createUser: internal.users.createUserGithub });

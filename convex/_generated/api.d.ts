@@ -8,9 +8,14 @@
  * @module
  */
 
+import type * as access from "../access.js";
 import type * as auth from "../auth.js";
-import type * as myFunctions from "../myFunctions.js";
+import type * as crons from "../crons.js";
+import type * as pipeline from "../pipeline.js";
+import type * as sources from "../sources.js";
 import type * as users from "../users.js";
+import type * as widgets from "../widgets.js";
+import type * as workflows from "../workflows.js";
 
 import type {
   ApiFromModules,
@@ -19,9 +24,14 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  access: typeof access;
   auth: typeof auth;
-  myFunctions: typeof myFunctions;
+  crons: typeof crons;
+  pipeline: typeof pipeline;
+  sources: typeof sources;
   users: typeof users;
+  widgets: typeof widgets;
+  workflows: typeof workflows;
 }>;
 
 /**
@@ -54,5 +64,8 @@ export declare const components: {
   auth: import("@convex-dev/auth/core/_generated/component.js").ComponentApi<"auth">;
   authPasswordProvider: import("@convex-dev/auth/providers/password/_generated/component.js").ComponentApi<"authPasswordProvider">;
   authUsername: import("@convex-dev/auth/username/_generated/component.js").ComponentApi<"authUsername">;
+  firecrawl: import("@firecrawl/firecrawl-convex/_generated/component.js").ComponentApi<"firecrawl">;
+  workflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"workflow">;
+  agent: import("@convex-dev/agent/_generated/component.js").ComponentApi<"agent">;
   oauthGithub: import("@convex-dev/auth/providers/oauth/_generated/component.js").ComponentApi<"oauthGithub">;
 };
