@@ -15,8 +15,6 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
-  GripVertical,
-  Plus,
   Redo2,
   RefreshCw,
   Save,
@@ -28,6 +26,7 @@ import {
 } from "lucide-react";
 import {
   clampFrame,
+  formatDataFieldTitle,
   formatValue,
   iconNames,
   sizes,
@@ -39,6 +38,7 @@ import { WidgetRenderer } from "./WidgetRenderer";
 import { editorReducer, newElement, type Design } from "./editorState";
 import { errorMessage, timeLabel } from "./ui";
 import { permitNavigation } from "./navigation";
+import { EmailWatch } from "./EmailWatch";
 
 type Gesture = {
   element: WidgetElement;
@@ -60,7 +60,14 @@ export function WidgetEditor({
 }) {
   const initial: Design = {
     name: widget?.name ?? source.title,
-    definition: initialDefinition,
+    definition: {
+      ...initialDefinition,
+      elements: initialDefinition.elements.map((element) =>
+        element.kind === "data"
+          ? { ...element, label: formatDataFieldTitle(element.label) }
+          : element,
+      ),
+    },
   };
   const [state, dispatch] = useReducer(editorReducer, {
     past: [],
@@ -81,6 +88,11 @@ export function WidgetEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [mobilePanel, setMobilePanel] = useState<"data" | "canvas" | "style">(
+    "canvas",
+  );
+  const [draggingFieldId, setDraggingFieldId] = useState<string | null>(null);
+  const [dropOverWidget, setDropOverWidget] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(480);
   const canvasContainer = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
@@ -94,7 +106,7 @@ export function WidgetEditor({
   const canvas = sizes[definition.size];
   const previewWidth = Math.min(
     viewportWidth,
-    definition.size === "1x1" ? 280 : definition.size === "2x2" ? 360 : 640,
+    definition.size === "square" ? 360 : 640,
   );
   const scale = previewWidth / canvas.width;
   const renderedDefinition =
@@ -159,12 +171,14 @@ export function WidgetEditor({
     const field = source.fields.find((item) => item.id === fieldId);
     const element = newElement(
       kind,
-      definition.theme === "light" ? "#172b28" : "#ffffff",
+      definition.theme === "light" ? "#111111" : "#ffffff",
       field,
       position,
     );
     change({ ...definition, elements: [...definition.elements, element] });
     setSelectedId(element.id);
+    if (kind === "data" && window.matchMedia("(max-width: 850px)").matches)
+      setMobilePanel("canvas");
   }
   function removeSelected() {
     change({
@@ -237,8 +251,7 @@ export function WidgetEditor({
       setSaved(submitted);
       setNotice("Widget saved. Live data refreshes every 15 minutes.");
       window.history.replaceState(null, "", `#widget=${result.widgetId}`);
-    } catch (err) {
-      setError(errorMessage(err));
+      return result.widgetId;
     } finally {
       setSaving(false);
     }
@@ -272,13 +285,9 @@ export function WidgetEditor({
                 })
               }
             />
-            <p>
-              {dirty
-                ? "Unsaved changes"
-                : target
-                  ? "All changes saved"
-                  : "Choose your details. Make it yours."}
-            </p>
+            {(dirty || target) && (
+              <p>{dirty ? "Unsaved changes" : "All changes saved"}</p>
+            )}
           </div>
         </div>
         <div className="row">
@@ -301,7 +310,11 @@ export function WidgetEditor({
           <button
             className="primary"
             disabled={saving || (target !== null && !dirty)}
-            onClick={() => void saveDesign()}
+            onClick={() =>
+              void saveDesign().catch((err: unknown) =>
+                setError(errorMessage(err)),
+              )
+            }
           >
             <Save size={16} />
             {saving ? "Saving…" : "Save widget"}
@@ -322,9 +335,30 @@ export function WidgetEditor({
           {notice}
         </div>
       )}
+      <div
+        className="editor-mobile-tabs"
+        role="tablist"
+        aria-label="Editor panels"
+      >
+        {(["data", "canvas", "style"] as const).map((panel) => (
+          <button
+            key={panel}
+            type="button"
+            role="tab"
+            aria-selected={mobilePanel === panel}
+            onClick={() => setMobilePanel(panel)}
+          >
+            {panel === "data"
+              ? "Live data"
+              : panel === "canvas"
+                ? "Widget"
+                : "Style"}
+          </button>
+        ))}
+      </div>
       <fieldset className="editor-fieldset" disabled={saving}>
         <div
-          className={`editor-grid ${saving ? "editor-saving" : ""}`}
+          className={`editor-grid mobile-panel-${mobilePanel} ${saving ? "editor-saving" : ""}`}
           aria-busy={saving}
         >
           <aside className="data-panel">
@@ -332,9 +366,6 @@ export function WidgetEditor({
               <span>Live data</span>
               <span className="count">{source.fields.length}</span>
             </div>
-            <p className="panel-description">
-              Everything we found. Drag a field onto your widget, or click +.
-            </p>
             <div className="field-list">
               {source.fields.map((field) => {
                 const used = definition.elements.some(
@@ -342,9 +373,13 @@ export function WidgetEditor({
                     element.kind === "data" && element.fieldId === field.id,
                 );
                 return (
-                  <div
+                  <button
                     key={field.id}
+                    type="button"
                     className={`field-card ${used ? "field-used" : ""}`}
+                    aria-label={`Add ${formatDataFieldTitle(field.label)}: ${formatValue(field)}`}
+                    title="Click to add or drag onto the widget"
+                    onClick={() => add("data", field.id)}
                     draggable
                     onDragStart={(event) => {
                       event.dataTransfer.setData(
@@ -352,57 +387,28 @@ export function WidgetEditor({
                         field.id,
                       );
                       event.dataTransfer.effectAllowed = "copy";
+                      setDraggingFieldId(field.id);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingFieldId(null);
+                      setDropOverWidget(false);
                     }}
                   >
-                    <div className="field-top">
-                      <GripVertical size={14} />
-                      <span>{field.label}</span>
-                      {used && (
-                        <span className="field-included">
-                          <Check size={12} /> Included
-                        </span>
-                      )}
-                      <button
-                        className="field-add"
-                        aria-label={`Add ${field.label}`}
-                        onClick={() => add("data", field.id)}
-                      >
-                        <Plus size={16} />
-                      </button>
-                    </div>
+                    <span className="field-title">
+                      {formatDataFieldTitle(field.label)}
+                    </span>
                     <strong>{formatValue(field)}</strong>
-                    <p>{field.description}</p>
-                    <div className="field-meta">
-                      {field.stale ? (
-                        <span className="stale">
-                          Stale · last value retained
-                        </span>
-                      ) : (
-                        <span>Live source value</span>
-                      )}
-                      <span>{timeLabel(field.observedAt)}</span>
-                    </div>
-                    {field.excerpt && (
-                      <details>
-                        <summary>Source evidence</summary>
-                        <p>{field.excerpt}</p>
-                      </details>
-                    )}
-                  </div>
+                  </button>
                 );
               })}
             </div>
             <div className="source-footer">
-              <span className="eyebrow">CONNECTED SOURCE</span>
+              <div className="panel-title">Source</div>
               <a href={source.url} target="_blank" rel="noreferrer">
                 {new URL(source.url).hostname} ↗
               </a>
               <p>Last updated {timeLabel(source.lastSuccessAt)}</p>
-              <p>
-                {target
-                  ? "Refreshes every 15 minutes"
-                  : "Automatic refresh starts after saving"}
-              </p>
+              {!target && <p>Refresh starts after saving</p>}
               {source.fields.some((field) => field.stale) && (
                 <p className="stale">
                   Some values are stale. Showing their last successful
@@ -432,6 +438,11 @@ export function WidgetEditor({
                 />
                 {source.refreshing ? "Refreshing…" : "Refresh now"}
               </button>
+              <EmailWatch
+                widgetId={target?.widgetId ?? null}
+                fields={source.fields}
+                onSaveWidget={saveDesign}
+              />
             </div>
           </aside>
           <section className="canvas-panel">
@@ -443,7 +454,7 @@ export function WidgetEditor({
                     className={definition.size === size ? "active" : ""}
                     onClick={() => change({ ...definition, size })}
                   >
-                    {size.replace("x", " × ")}
+                    {sizes[size].label}
                   </button>
                 ))}
               </div>
@@ -457,25 +468,36 @@ export function WidgetEditor({
               onClick={() => setSelectedId(null)}
             >
               <div
-                className="canvas-drop-zone"
+                className={`canvas-drop-zone ${draggingFieldId ? "can-drop" : ""} ${dropOverWidget ? "drop-over" : ""}`}
                 onDragOver={(event) => {
                   if (
                     event.dataTransfer.types.includes(
                       "application/widget-field",
                     )
-                  )
+                  ) {
                     event.preventDefault();
+                    event.dataTransfer.dropEffect = "copy";
+                    setDropOverWidget(true);
+                  }
+                }}
+                onDragLeave={(event) => {
+                  if (
+                    !event.currentTarget.contains(event.relatedTarget as Node)
+                  )
+                    setDropOverWidget(false);
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
+                  setDropOverWidget(false);
+                  setDraggingFieldId(null);
                   const id = event.dataTransfer.getData(
                     "application/widget-field",
                   );
                   if (!source.fields.some((field) => field.id === id)) return;
                   const rect = event.currentTarget.getBoundingClientRect();
                   add("data", id, {
-                    x: (event.clientX - rect.left) / rect.width,
-                    y: (event.clientY - rect.top) / rect.height,
+                    x: (event.clientX - rect.left) / rect.width - 0.275,
+                    y: (event.clientY - rect.top) / rect.height - 0.125,
                   });
                 }}
               >
@@ -544,12 +566,9 @@ export function WidgetEditor({
               <p className="canvas-caption">
                 {sizes[definition.size].label} widget <span>·</span>{" "}
                 {canvas.width} × {canvas.height}
-                <br />
-                <span>Drag to position. Pull the corner to resize.</span>
               </p>
             </div>
             <div className="add-toolbar">
-              <span>Add something</span>
               <button onClick={() => add("text")}>
                 <Type size={16} />
                 Text
@@ -583,26 +602,26 @@ export function WidgetEditor({
             <div className="theme-presets">
               {[
                 {
-                  name: "Forest",
-                  background: "#183f36",
-                  foreground: "#ffffff",
-                  theme: "dark",
-                },
-                {
-                  name: "Paper",
-                  background: "#f6f3ec",
-                  foreground: "#243b34",
+                  name: "White",
+                  background: "#ffffff",
+                  foreground: "#111111",
                   theme: "light",
                 },
                 {
-                  name: "Midnight",
-                  background: "#20283e",
+                  name: "Light grey",
+                  background: "#f3f3f3",
+                  foreground: "#111111",
+                  theme: "light",
+                },
+                {
+                  name: "Black",
+                  background: "#111111",
                   foreground: "#ffffff",
                   theme: "dark",
                 },
                 {
-                  name: "Terracotta",
-                  background: "#a7513e",
+                  name: "Blue",
+                  background: "#2563eb",
                   foreground: "#ffffff",
                   theme: "dark",
                 },
@@ -656,20 +675,22 @@ export function WidgetEditor({
                       <select
                         aria-label="Bound field"
                         value={selected.fieldId}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                          const field = source.fields.find(
+                            (item) => item.id === event.target.value,
+                          );
                           editElement({
                             ...selected,
                             fieldId: event.target.value,
-                            label:
-                              source.fields.find(
-                                (field) => field.id === event.target.value,
-                              )?.label ?? "",
-                          })
-                        }
+                            label: field
+                              ? formatDataFieldTitle(field.label)
+                              : "",
+                          });
+                        }}
                       >
                         {source.fields.map((field) => (
                           <option key={field.id} value={field.id}>
-                            {field.label}
+                            {formatDataFieldTitle(field.label)}
                           </option>
                         ))}
                       </select>
@@ -1002,7 +1023,7 @@ export function WidgetEditor({
             ) : (
               <div className="selection-empty">
                 <Sparkles size={24} />
-                <p>Select an element to fine-tune its details.</p>
+                <p>Select an element to edit it.</p>
               </div>
             )}
             <div className="panel-divider" />
@@ -1022,7 +1043,7 @@ export function WidgetEditor({
                         : "◇"}
                   </span>
                   {element.kind === "data"
-                    ? element.label
+                    ? formatDataFieldTitle(element.label)
                     : element.kind === "text"
                       ? element.text
                       : element.kind}

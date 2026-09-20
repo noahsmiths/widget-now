@@ -1,6 +1,7 @@
 import {
   clampFrame,
   defaultStyle,
+  formatDataFieldTitle,
   type DataField,
   type WidgetDefinitionV1,
   type WidgetElement,
@@ -56,7 +57,7 @@ export function newElement(
         ...base,
         kind,
         fieldId: field.id,
-        label: field.label,
+        label: formatDataFieldTitle(field.label),
         showLabel: true,
         showUnit: true,
         precision: 0,

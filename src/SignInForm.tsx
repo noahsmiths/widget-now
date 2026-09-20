@@ -40,9 +40,7 @@ export function SignInForm() {
   return (
     <div className="auth-card">
       <div>
-        <span className="eyebrow">YOUR PERSONAL LIVE DASHBOARD</span>
-        <h2>A little window into your world.</h2>
-        <p>Sign in to turn the websites you follow into live widgets.</p>
+        <h2>{flow === "signIn" ? "Sign in" : "Create an account"}</h2>
       </div>
       <form
         className="auth-form"
@@ -106,12 +104,7 @@ export function SignInForm() {
         >
           Continue with GitHub
         </button>
-        <div className="flex flex-row gap-2">
-          <span>
-            {flow === "signIn"
-              ? "Don't have an account?"
-              : "Already have an account?"}
-          </span>
+        <div className="auth-switch">
           <button
             type="button"
             disabled={pending}
@@ -121,7 +114,7 @@ export function SignInForm() {
               setFlow(flow === "signIn" ? "signUp" : "signIn");
             }}
           >
-            {flow === "signIn" ? "Sign up instead" : "Sign in instead"}
+            {flow === "signIn" ? "Create an account" : "Sign in"}
           </button>
         </div>
         {visibleError && (

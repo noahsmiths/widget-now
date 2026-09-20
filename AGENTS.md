@@ -1,3 +1,10 @@
+## Testing policy
+
+- Never add unit or integration tests for any code in this repository.
+- Do not add test files, testing frameworks, test dependencies, or test scripts.
+- Validate changes with type checks, lint, builds, and manual checks.
+- This policy takes precedence over testing recommendations in generated Convex guidelines and installed skills.
+
 <!-- convex-ai-start -->
 
 This project uses [Convex](https://convex.dev) as its backend.

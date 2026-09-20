@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  formatDataFieldTitle,
   formatValue,
   sizes,
   type DataField,
@@ -62,7 +63,7 @@ export function WidgetRenderer({
           width: canvas.width,
           height: canvas.height,
           background: definition.background,
-          borderRadius: definition.size === "1x1" ? 22 : 32,
+          borderRadius: 32,
           transform: `scale(${scale})`,
         }}
       >
@@ -108,7 +109,7 @@ export function WidgetRenderer({
                       className="widget-data-label"
                       style={{ fontSize: Math.max(8, style.fontSize * 0.36) }}
                     >
-                      {element.label}
+                      {formatDataFieldTitle(element.label)}
                     </div>
                   )}
                   <div

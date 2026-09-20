@@ -17,6 +17,10 @@ const app = defineApp({
     FIRECRAWL_API_KEY: v.string(),
     OPENAI_API_KEY: v.optional(v.string()),
     OPENAI_MODEL: v.optional(v.string()),
+    AGENTMAIL_API_KEY: v.optional(v.string()),
+    AGENTMAIL_INBOX_ID: v.optional(v.string()),
+    AGENTMAIL_WEBHOOK_SECRET: v.optional(v.string()),
+    APP_URL: v.optional(v.string()),
   },
 });
 
@@ -32,6 +36,7 @@ app.use(passwordProvider);
 app.use(username);
 app.use(firecrawl, { env: { FIRECRAWL_API_KEY: app.env.FIRECRAWL_API_KEY } });
 app.use(workflow);
+app.use(workflow, { name: "mailWorkflow" });
 app.use(agent);
 app.use(oauth, {
   name: "oauthGithub",

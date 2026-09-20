@@ -26,6 +26,7 @@ import {
 import schema from "./schema";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { removeWidgetWatch } from "./watches";
 
 export const list = query({
   args: { paginationOpts: paginationOptsValidator },
@@ -123,8 +124,10 @@ export const remove = mutation({
     const widgets = ctx.db
       .query("widgets")
       .withIndex("by_sourceId", (q) => q.eq("sourceId", source._id));
-    for await (const widget of widgets)
+    for await (const widget of widgets) {
+      await removeWidgetWatch(ctx, widget._id);
       await ctx.db.delete("widgets", widget._id);
+    }
     await ctx.db.delete("sources", source._id);
     return null;
   },
@@ -162,8 +165,8 @@ export const finishGeneration = internalMutation({
     const source = await ctx.db.get("sources", args.sourceId);
     if (!source || source.run !== args.run) return null;
     if (
-      args.candidates.length !== 3 ||
-      new Set(args.candidates.map((candidate) => candidate.size)).size !== 3
+      args.candidates.length !== 2 ||
+      new Set(args.candidates.map((candidate) => candidate.size)).size !== 2
     )
       throw new Error("Expected one candidate per size.");
     for (const candidate of args.candidates)
@@ -248,6 +251,7 @@ export const finishRefresh = internalMutation({
       fields: args.fields,
       lastSuccessAt: Date.now(),
     });
+    await ctx.scheduler.runAfter(0, internal.watches.evaluate, args);
     return null;
   },
 });

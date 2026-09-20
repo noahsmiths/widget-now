@@ -23,9 +23,11 @@ export const generate = workflow.define({
       markdown: page.markdown,
       refresh: false,
     });
+    if (!page.palette) throw new Error("The page palette was unavailable.");
     const candidates = await step.runAction(internal.pipeline.design, {
       ...args,
       fields,
+      palette: page.palette,
     });
     await step.runMutation(internal.sources.finishGeneration, {
       ...args,

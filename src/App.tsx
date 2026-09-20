@@ -78,7 +78,6 @@ export default function App() {
             <Grid2X2 size={19} />
           </span>
           widget<span className="brand-now">now</span>
-          <span className="beta">BETA</span>
         </button>
         <nav>
           {isAuthenticated && (
@@ -87,19 +86,17 @@ export default function App() {
                 className={route.kind === "library" ? "nav-active" : ""}
                 onClick={home}
               >
-                My widgets
+                Widgets
               </button>
               <button onClick={() => navigate({ kind: "create" })}>
-                Create a widget
+                Create
               </button>
             </>
           )}
         </nav>
         <div className="header-right">
-          <span className="live-dot" />
           {isAuthenticated ? (
             <>
-              <span>Your world, at a glance</span>
               <button
                 className="icon-button"
                 aria-label="Sign out"
@@ -110,9 +107,7 @@ export default function App() {
                 <LogOut size={17} />
               </button>
             </>
-          ) : (
-            <span>Little widgets. Live possibilities.</span>
-          )}
+          ) : null}
         </div>
       </header>
       {isLoading ? (
@@ -122,33 +117,12 @@ export default function App() {
           <Unauthenticated>
             <main className="auth-layout">
               <div className="auth-story">
-                <span className="eyebrow">THE WEB, A LITTLE CLOSER</span>
                 <h1>
-                  Your favorite websites.
+                  Websites you follow.
                   <br />
-                  <em>In a widget.</em>
+                  <em>In one place.</em>
                 </h1>
-                <p>
-                  Turn the information you care about into beautiful little
-                  windows that stay up to date.
-                </p>
-                <div className="auth-samples">
-                  <SampleWidgets />
-                </div>
-                <div className="feature-row">
-                  <span>
-                    <Check size={14} />
-                    Live website data
-                  </span>
-                  <span>
-                    <Check size={14} />
-                    Made yours
-                  </span>
-                  <span>
-                    <Check size={14} />
-                    Always current
-                  </span>
-                </div>
+                <p>Turn a public page into a live, editable widget.</p>
               </div>
               <SignInForm />
             </main>
@@ -184,10 +158,6 @@ export default function App() {
           </Authenticated>
         </>
       )}
-      <footer className="app-footer">
-        <span>Made for the things you keep checking.</span>
-        <span>widget now · v1</span>
-      </footer>
     </div>
   );
 }
@@ -218,11 +188,7 @@ function Library({
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">YOUR PERSONAL COLLECTION</span>
-          <h1>
-            My widgets<span className="heading-dot">.</span>
-          </h1>
-          <p>A little less searching. A little more knowing.</p>
+          <h1>My widgets</h1>
         </div>
         <button className="primary" onClick={onCreate}>
           <Plus size={17} />
@@ -280,28 +246,14 @@ function Library({
         </>
       ) : (
         <div className="library-empty">
-          <div className="empty-samples">
-            <SampleWidgets />
-          </div>
-          <span className="eyebrow">A WINDOW INTO WHAT MATTERS</span>
-          <h2>Your first widget is one link away.</h2>
-          <p>
-            The weather. A price you’re watching. Your favorite team.
-            <br />
-            Bring the bits of the web you love into one place.
-          </p>
-          <button className="primary" onClick={onCreate}>
-            <Sparkles size={17} />
-            Make my first widget
-            <ArrowRight size={16} />
-          </button>
+          <h2>No widgets yet</h2>
+          <p>Add a public website to get started.</p>
         </div>
       )}
       {sources.results.length > 0 && (
         <section className="recent-sources">
           <div className="section-heading">
             <h2>Recent generations</h2>
-            <span>Pick up where you left off</span>
           </div>
           {sources.results.map((source) => (
             <div className="source-row" key={source._id}>
@@ -358,7 +310,7 @@ function LibraryPreview({ widget }: { widget: Doc<"widgets"> }) {
       <WidgetRenderer
         definition={widget.definition}
         fields={source?.fields ?? []}
-        width={widget.definition.size === "2x4" ? 264 : 192}
+        width={widget.definition.size === "rectangle" ? 264 : 192}
       />
       <span
         className={`preview-status ${source?.fields.some((field) => field.stale) ? "stale" : ""}`}
@@ -368,7 +320,7 @@ function LibraryPreview({ widget }: { widget: Doc<"widgets"> }) {
           ? "Refreshing"
           : source?.fields.some((field) => field.stale)
             ? "Stale data"
-            : "Live · every 15 min"}
+            : "Live"}
       </span>
     </div>
   );
@@ -393,29 +345,8 @@ function CreateWidget({
           <ArrowLeft size={15} />
           My widgets
         </button>
-        <span className="eyebrow">FROM WEBSITE TO WIDGET</span>
-        <h1>
-          Keep the good bits.
-          <br />
-          <em>Skip the searching.</em>
-        </h1>
-        <p>
-          Drop in a link. We’ll find the useful data and suggest three beautiful
-          ways to see it. You make it yours.
-        </p>
-        <div className="creation-steps">
-          {[
-            "Connect a website",
-            "Choose a starting point",
-            "Make it your own",
-          ].map((step, index) => (
-            <div key={step}>
-              <span>{index + 1}</span>
-              {step}
-            </div>
-          ))}
-        </div>
-        <SampleWidgets />
+        <h1>Create a widget</h1>
+        <p>Start with a public website.</p>
       </div>
       <form
         className="creation-card"
@@ -429,13 +360,7 @@ function CreateWidget({
             .finally(() => setPending(false));
         }}
       >
-        <div className="creation-card-icon">
-          <Globe size={23} />
-        </div>
-        <h2>What’s your widget about?</h2>
-        <p>
-          Start with a public page that has the information you want to follow.
-        </p>
+        <h2>Website details</h2>
         <label>
           Website link
           <input
@@ -453,15 +378,12 @@ function CreateWidget({
           <textarea
             placeholder="e.g. The current temperature, conditions, and humidity in Brooklyn"
             maxLength={2000}
-            rows={4}
+            rows={2}
             value={blurb}
             disabled={pending}
             onChange={(event) => setBlurb(event.target.value)}
           />
         </label>
-        <p className="form-hint">
-          Be specific, or leave it to us to find the highlights.
-        </p>
         {error && (
           <div className="alert" role="alert">
             {error}
@@ -476,10 +398,6 @@ function CreateWidget({
           {pending ? "Connecting…" : "Generate my widgets"}
           <ArrowRight size={16} />
         </button>
-        <span className="creation-note">
-          <span className="live-dot" />
-          Live data. Three sizes. Endless possibilities.
-        </span>
       </form>
     </div>
   );
@@ -543,8 +461,7 @@ function SourceView({
         <span className="generation-icon">
           <Sparkles size={28} className="pulse" />
         </span>
-        <span className="eyebrow">A LITTLE MAGIC IN PROGRESS</span>
-        <h2>Your website, taking a new shape.</h2>
+        <h2>Creating your widgets</h2>
         <p>{new URL(source.url).hostname}</p>
         <div className="generation-progress">
           {[
@@ -588,14 +505,8 @@ function SourceView({
       </button>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">THREE WAYS TO SEE YOUR WORLD</span>
-          <h1>
-            Choose a starting point<span className="heading-dot">.</span>
-          </h1>
-          <p>
-            We found {source.fields.length} data points. Pick a design, then
-            change anything.
-          </p>
+          <h1>Choose a design</h1>
+          <p>{source.fields.length} fields found · Customize after choosing</p>
         </div>
         <span className="connected-pill">
           <span className="live-dot" />
@@ -609,14 +520,13 @@ function SourceView({
               <WidgetRenderer
                 definition={definition}
                 fields={source.fields}
-                width={definition.size === "2x4" ? 280 : 224}
+                width={definition.size === "rectangle" ? 280 : 224}
               />
             </div>
             <div className="candidate-info">
               <div>
                 <h3>{sizes[definition.size].label}</h3>
                 <span>
-                  {definition.size.replace("x", " × ")} ·{" "}
                   {
                     definition.elements.filter(
                       (element) => element.kind === "data",
@@ -636,10 +546,6 @@ function SourceView({
           </div>
         ))}
       </div>
-      <p className="candidate-note">
-        <Sparkles size={15} />A suggestion is just the beginning. All extracted
-        fields are available in the editor.
-      </p>
     </>
   );
 }
@@ -667,125 +573,6 @@ function Loading() {
     <div className="loading">
       <LoaderCircle size={24} className="spin" />
       <span>Loading your world…</span>
-    </div>
-  );
-}
-function SampleWidgets() {
-  const fields = [
-    {
-      id: "temperature",
-      label: "Temperature",
-      description: "",
-      type: "number" as const,
-      value: 24,
-      unit: "°",
-      excerpt: "",
-      stale: false,
-      observedAt: 0,
-    },
-    {
-      id: "price",
-      label: "S&P 500",
-      description: "",
-      type: "number" as const,
-      value: 5872.16,
-      unit: "",
-      excerpt: "",
-      stale: false,
-      observedAt: 0,
-    },
-  ];
-  const style = {
-    color: "#ffffff",
-    fontSize: 38,
-    fontWeight: 500 as const,
-    align: "left" as const,
-    wrap: false,
-    opacity: 1,
-  };
-  const weather: WidgetDefinitionV1 = {
-    version: 1,
-    size: "1x1",
-    background: "#234d42",
-    theme: "dark",
-    elements: [
-      {
-        id: "city",
-        kind: "text",
-        text: "Brooklyn",
-        frame: { x: 0.12, y: 0.1, width: 0.7, height: 0.13 },
-        style: { ...style, fontSize: 13 },
-      },
-      {
-        id: "sun",
-        kind: "icon",
-        icon: "sun",
-        frame: { x: 0.67, y: 0.33, width: 0.23, height: 0.23 },
-        style: { ...style, fontSize: 32, color: "#e9d697" },
-      },
-      {
-        id: "temp",
-        kind: "data",
-        fieldId: "temperature",
-        label: "",
-        showLabel: false,
-        showUnit: true,
-        precision: 0,
-        frame: { x: 0.1, y: 0.27, width: 0.55, height: 0.36 },
-        style: { ...style, fontSize: 48 },
-      },
-      {
-        id: "desc",
-        kind: "text",
-        text: "Mostly sunny\nA good day to get outside.",
-        frame: { x: 0.12, y: 0.7, width: 0.8, height: 0.23 },
-        style: { ...style, fontSize: 10, wrap: true, opacity: 0.85 },
-      },
-    ],
-  };
-  const market: WidgetDefinitionV1 = {
-    version: 1,
-    size: "1x1",
-    background: "#f1ece3",
-    theme: "light",
-    elements: [
-      {
-        id: "title",
-        kind: "text",
-        text: "Market watch",
-        frame: { x: 0.12, y: 0.12, width: 0.8, height: 0.14 },
-        style: { ...style, fontSize: 12, color: "#394e42" },
-      },
-      {
-        id: "price",
-        kind: "data",
-        fieldId: "price",
-        label: "S&P 500",
-        showLabel: true,
-        showUnit: false,
-        precision: 2,
-        frame: { x: 0.12, y: 0.35, width: 0.8, height: 0.34 },
-        style: { ...style, fontSize: 25, color: "#203c2e" },
-      },
-      {
-        id: "trend",
-        kind: "text",
-        text: "↗ +1.24% today",
-        frame: { x: 0.12, y: 0.75, width: 0.8, height: 0.13 },
-        style: { ...style, fontSize: 12, color: "#52785b" },
-      },
-    ],
-  };
-  return (
-    <div
-      className="sample-widgets"
-      aria-label="Example widgets with illustrative data"
-    >
-      <WidgetRenderer definition={weather} fields={fields} width={160} />
-      <WidgetRenderer definition={market} fields={fields} width={160} />
-      <span className="sample-label">
-        A few possibilities · illustrative data
-      </span>
     </div>
   );
 }

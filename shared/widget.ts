@@ -1,9 +1,8 @@
 import { v, type Infer } from "convex/values";
 
 export const sizeValidator = v.union(
-  v.literal("1x1"),
-  v.literal("2x2"),
-  v.literal("2x4"),
+  v.literal("square"),
+  v.literal("rectangle"),
 );
 export const iconNames = [
   "sun",
@@ -67,6 +66,14 @@ export const definitionValidator = v.object({
   theme: v.union(v.literal("light"), v.literal("dark"), v.literal("custom")),
   elements: v.array(elementValidator),
 });
+export const paletteValidator = v.object({
+  background: v.string(),
+  foreground: v.string(),
+  surface: v.string(),
+  surfaceForeground: v.string(),
+  accent: v.string(),
+  accentForeground: v.string(),
+});
 export const scalarValidator = v.union(
   v.string(),
   v.number(),
@@ -85,6 +92,7 @@ export const fieldValidator = v.object({
   observedAt: v.union(v.number(), v.null()),
 });
 export type WidgetDefinitionV1 = Infer<typeof definitionValidator>;
+export type WidgetPalette = Infer<typeof paletteValidator>;
 export type WidgetElement = Infer<typeof elementValidator>;
 export type DataField = Infer<typeof fieldValidator>;
 export type WidgetSize = Infer<typeof sizeValidator>;
@@ -93,9 +101,8 @@ export const sizes: Record<
   WidgetSize,
   { width: number; height: number; label: string }
 > = {
-  "1x1": { width: 160, height: 160, label: "Small" },
-  "2x2": { width: 320, height: 320, label: "Large" },
-  "2x4": { width: 640, height: 320, label: "Wide" },
+  square: { width: 320, height: 320, label: "Square" },
+  rectangle: { width: 640, height: 320, label: "Rectangle" },
 };
 export const defaultStyle: ElementStyle = {
   color: "#ffffff",
@@ -105,6 +112,15 @@ export const defaultStyle: ElementStyle = {
   wrap: false,
   opacity: 1,
 };
+
+export function formatDataFieldTitle(label: string) {
+  if (!label.includes("_")) return label;
+  return label
+    .split(/_+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
 
 export function formatValue(
   field: DataField | undefined,

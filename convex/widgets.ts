@@ -7,6 +7,7 @@ import { mutation, query } from "./_generated/server";
 import schema from "./schema";
 import { requireSource, requireUser, requireWidget } from "./access";
 import { definitionValidator, validateDefinition } from "../shared/widget";
+import { removeWidgetWatch } from "./watches";
 
 export const list = query({
   args: { paginationOpts: paginationOptsValidator },
@@ -92,6 +93,7 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const widget = await requireWidget(ctx, args.widgetId);
     const source = await requireSource(ctx, widget.sourceId);
+    await removeWidgetWatch(ctx, widget._id);
     await ctx.db.delete("widgets", widget._id);
     await ctx.db.patch("sources", source._id, {
       savedCount: source.savedCount - 1,
