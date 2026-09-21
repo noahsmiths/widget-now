@@ -68,6 +68,14 @@ function readRoute(): Route {
 }
 
 export default function App() {
+  return /^\/privacy\/?$/.test(window.location.pathname) ? (
+    <PrivacyPolicy />
+  ) : (
+    <ProductApp />
+  );
+}
+
+function ProductApp() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { signOut } = useAuthActions();
   const [route, setRoute] = useState<Route>(readRoute);
@@ -182,6 +190,149 @@ export default function App() {
         </>
       )}
     </div>
+  );
+}
+
+function PrivacyPolicy() {
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = "Privacy Policy | Widget Now";
+    return () => {
+      document.title = previousTitle;
+    };
+  }, []);
+
+  return (
+    <main className="privacy-page">
+      <article className="privacy-policy">
+        <div className="privacy-brand" aria-label="Widget Now">
+          <img src="/widget.svg" alt="" />
+          <span>
+            widget<strong>now</strong>
+          </span>
+        </div>
+
+        <header className="privacy-heading">
+          <h1>Privacy policy</h1>
+          <p>Effective September 21, 2026</p>
+        </header>
+
+        <p>
+          Widget Now turns public webpages into private, editable widgets. This
+          policy explains what information the service handles and why.
+        </p>
+
+        <section>
+          <h2>Information we collect</h2>
+          <ul>
+            <li>
+              Account information, including your email address and information
+              provided by GitHub if you choose GitHub sign-in.
+            </li>
+            <li>
+              Content you provide, including public webpage URLs, generation
+              instructions, widget names and designs, and notification rules.
+            </li>
+            <li>
+              Content generated for you, including extracted webpage fields,
+              source excerpts, refresh history, and saved widget data.
+            </li>
+            <li>
+              Email notification information, including the recipient address,
+              delivery status, and replies you send to notification emails.
+            </li>
+            <li>
+              Standard technical information processed by our infrastructure
+              providers to operate, secure, and troubleshoot the service.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>How we use information</h2>
+          <p>
+            We use this information to authenticate you, create and refresh
+            widgets, save your private widget library, deliver notifications,
+            respond to support or privacy requests, prevent abuse, and maintain
+            the service.
+          </p>
+        </section>
+
+        <section>
+          <h2>Service providers</h2>
+          <p>
+            Widget Now uses Convex for authentication, application data, and
+            hosting; Firecrawl to retrieve the public pages you submit; OpenAI
+            to extract page data, generate widget designs, and interpret email
+            notification instructions; AgentMail to deliver and process
+            notification emails; and GitHub when you choose GitHub sign-in.
+            These providers process information only as needed to perform their
+            services for Widget Now.
+          </p>
+          <p>
+            We may also disclose information when required by law, to protect
+            the service or others, or as part of a business transfer. We do not
+            sell personal information or use it for targeted advertising.
+          </p>
+        </section>
+
+        <section>
+          <h2>Browser storage</h2>
+          <p>
+            We use storage required for authentication and security. Widget Now
+            also stores your preferred widget order in your browser. We do not
+            currently use advertising cookies.
+          </p>
+        </section>
+
+        <section>
+          <h2>Retention and deletion</h2>
+          <p>
+            We keep account and widget information while it is needed to
+            provide the service. Deleting a widget also deletes its associated
+            generation, source data, notification rules, and related mail
+            records. Some limited records may remain temporarily in backups,
+            security logs, or where retention is required by law.
+          </p>
+        </section>
+
+        <section>
+          <h2>Security</h2>
+          <p>
+            We use reasonable administrative and technical measures intended to
+            protect your information. No internet service can guarantee
+            complete security.
+          </p>
+        </section>
+
+        <section>
+          <h2>Your choices</h2>
+          <p>
+            You can delete widgets and their associated generations from Widget
+            Now, pause or remove notification rules, and stop notification
+            emails using the controls in the service or the instructions in an
+            email. For other access, correction, or deletion requests, contact
+            the person or organization that provided your access to Widget Now.
+          </p>
+        </section>
+
+        <section>
+          <h2>Children</h2>
+          <p>
+            Widget Now is not directed to children under 13, and we do not
+            knowingly collect personal information from children under 13.
+          </p>
+        </section>
+
+        <section>
+          <h2>Changes to this policy</h2>
+          <p>
+            We may update this policy as the service changes. The effective date
+            above shows when this version took effect.
+          </p>
+        </section>
+      </article>
+    </main>
   );
 }
 

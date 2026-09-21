@@ -49,6 +49,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A1B2C3D4E5F60718293A4B5C /* Development.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Development.xcconfig; sourceTree = "<group>"; };
+		B1C2D3E4F5061728394A5B6C /* Production.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Production.xcconfig; sourceTree = "<group>"; };
 		2C9E8B3F7A4D5E6B0C1F2A38 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		31397E596EEA3822161B038C /* WidgetNowWidgets.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = WidgetNowWidgets.entitlements; sourceTree = "<group>"; };
 		38A383401C75E5E082B76DC7 /* WidgetNow.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = WidgetNow.entitlements; sourceTree = "<group>"; };
@@ -90,12 +92,22 @@
 		348E7B932BFD3E8FFBB4CA06 = {
 			isa = PBXGroup;
 			children = (
+				C1D2E3F40516273849A5B6C7 /* Config */,
 				C270899C5E73EAEE860F208B /* Products */,
 				C5CDE49531B7D54EAB8183CD /* Frameworks */,
 				A139F2B2FB2772C4C7EB2962 /* Shared */,
 				A754531CF052828A2A7CB11B /* App */,
 				CDA40C798E74396D693AC654 /* WidgetExtension */,
 			);
+			sourceTree = "<group>";
+		};
+		C1D2E3F40516273849A5B6C7 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F60718293A4B5C /* Development.xcconfig */,
+				B1C2D3E4F5061728394A5B6C /* Production.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		A139F2B2FB2772C4C7EB2962 /* Shared */ = {
@@ -287,6 +299,7 @@
 /* Begin XCBuildConfiguration section */
 		18FA6E93A85F6232DAB9C887 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = B1C2D3E4F5061728394A5B6C /* Production.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;
@@ -302,13 +315,14 @@
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
 		34879BC742C3C5823A9AA8F6 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = B1C2D3E4F5061728394A5B6C /* Production.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -363,6 +377,7 @@
 		};
 		5D216C33FB89A3CA3CCF1F5F /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = B1C2D3E4F5061728394A5B6C /* Production.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -383,13 +398,14 @@
 				SKIP_INSTALL = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
 		9BCFEAF29DEF29652928D56D /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1B2C3D4E5F60718293A4B5C /* Development.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -451,6 +467,7 @@
 		};
 		C98CC49629A5388371D2D9D2 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1B2C3D4E5F60718293A4B5C /* Development.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;
@@ -466,12 +483,13 @@
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
 		D93B36385B7A2E8425A3275C /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1B2C3D4E5F60718293A4B5C /* Development.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -492,7 +510,7 @@
 				SKIP_INSTALL = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};

@@ -10,6 +10,10 @@
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.0</string>
     <key>CFBundleVersion</key><string>1</string>
+    <key>ConvexDeployment</key><string>$(CONVEX_DEPLOYMENT)</string>
+    <key>UISupportedInterfaceOrientations</key><array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
     <key>UILaunchScreen</key><dict/>
     <key>KeychainAccessGroup</key><string>$(AppIdentifierPrefix)com.widgetnow.shared</string>
     <key>CFBundleURLTypes</key><array><dict>

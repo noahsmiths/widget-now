@@ -10,6 +10,7 @@
     <key>CFBundlePackageType</key><string>XPC!</string>
     <key>CFBundleShortVersionString</key><string>1.0</string>
     <key>CFBundleVersion</key><string>1</string>
+    <key>ConvexDeployment</key><string>$(CONVEX_DEPLOYMENT)</string>
     <key>KeychainAccessGroup</key><string>$(AppIdentifierPrefix)com.widgetnow.shared</string>
     <key>NSExtension</key><dict>
         <key>NSExtensionPointIdentifier</key><string>com.apple.widgetkit-extension</string>

@@ -11,6 +11,9 @@ widget = project.new_target(:app_extension, "WidgetNowWidgets", :ios, "17.0")
 shared = project.main_group.new_group("Shared", "Shared")
 app_group = project.main_group.new_group("App", "App")
 widget_group = project.main_group.new_group("WidgetExtension", "WidgetExtension")
+config_group = project.main_group.new_group("Config", "Config")
+development_config = config_group.new_file("Development.xcconfig")
+production_config = config_group.new_file("Production.xcconfig")
 
 {
   shared => %w[WidgetModels.swift WidgetCanvas.swift AccountSession.swift],
@@ -22,6 +25,13 @@ widget_group = project.main_group.new_group("WidgetExtension", "WidgetExtension"
     app.source_build_phase.add_file_reference(file) if group == shared || (group == app_group && name.end_with?(".swift"))
     app.resources_build_phase.add_file_reference(file) if group == app_group && name == "Assets.xcassets"
     widget.source_build_phase.add_file_reference(file) if group == shared || (group == widget_group && name.end_with?(".swift"))
+  end
+end
+
+[project, app, widget].each do |configurable|
+  configurable.build_configurations.each do |configuration|
+    configuration.base_configuration_reference =
+      configuration.name == "Debug" ? development_config : production_config
   end
 end
 
@@ -43,7 +53,7 @@ project.root_object.package_references << package
     settings = configuration.build_settings
     settings["SWIFT_VERSION"] = "5.0"
     settings["IPHONEOS_DEPLOYMENT_TARGET"] = "17.0"
-    settings["TARGETED_DEVICE_FAMILY"] = "1,2"
+    settings["TARGETED_DEVICE_FAMILY"] = "1"
     settings["CODE_SIGN_STYLE"] = "Automatic"
     settings["GENERATE_INFOPLIST_FILE"] = "NO"
     settings["SWIFT_EMIT_LOC_STRINGS"] = "YES"

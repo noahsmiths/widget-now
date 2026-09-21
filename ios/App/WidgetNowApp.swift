@@ -204,7 +204,7 @@ private struct SignInView: View {
                             .font(.system(size: 44, weight: .semibold))
                             .foregroundStyle(.tint)
                             .padding(.bottom, 12)
-                        Text("Your widgets, on your Home Screen.")
+                        Text("Widget Now")
                             .font(.title.bold())
                             .fixedSize(horizontal: false, vertical: true)
                         Text("Sign in with the same account you use on Widget Now.")

@@ -99,6 +99,71 @@ textarea::placeholder {
   display: flex;
   flex-direction: column;
 }
+.privacy-page {
+  min-height: 100dvh;
+  padding: 64px 24px 88px;
+  background: #fff;
+}
+.privacy-policy {
+  width: min(700px, 100%);
+  margin: 0 auto;
+  color: var(--color-ink);
+  font-size: 14px;
+  line-height: 1.75;
+}
+.privacy-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 64px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+.privacy-brand img {
+  width: 25px;
+  height: 25px;
+  margin-right: 2px;
+}
+.privacy-brand strong {
+  color: var(--color-accent);
+}
+.privacy-heading {
+  margin-bottom: 28px;
+}
+.privacy-heading h1 {
+  max-width: none;
+  font-size: clamp(36px, 7vw, 52px);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.privacy-heading p {
+  margin-top: 12px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.privacy-policy > p,
+.privacy-policy section {
+  max-width: 68ch;
+}
+.privacy-policy section {
+  margin-top: 32px;
+}
+.privacy-policy section h2 {
+  margin-bottom: 8px;
+  font-size: 16px;
+  line-height: 1.35;
+}
+.privacy-policy section p + p {
+  margin-top: 12px;
+}
+.privacy-policy ul {
+  margin: 0;
+  padding-left: 20px;
+}
+.privacy-policy li + li {
+  margin-top: 7px;
+}
 .app-header {
   height: 62px;
   flex-shrink: 0;

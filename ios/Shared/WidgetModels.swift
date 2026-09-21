@@ -1,8 +1,9 @@
 import Foundation
 
 enum CompanionConfig {
-    static let deploymentURL = "https://uncommon-hummingbird-519.convex.cloud"
-    static let siteURL = "https://uncommon-hummingbird-519.convex.site"
+    private static let deployment = Bundle.main.object(forInfoDictionaryKey: "ConvexDeployment") as! String
+    static let deploymentURL = "https://\(deployment).convex.cloud"
+    static let siteURL = "https://\(deployment).convex.site"
     static let appGroup = "group.com.widgetnow.shared"
 }
 
