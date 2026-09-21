@@ -3,6 +3,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type DragEvent,
   type PointerEvent,
   type ReactNode,
 } from "react";
@@ -33,19 +34,189 @@ import {
   type WidgetDefinitionV1,
   type WidgetElement,
   type WidgetSize,
+  type DataField,
 } from "../shared/widget";
 import { WidgetRenderer } from "./WidgetRenderer";
-import { editorReducer, newElement, type Design } from "./editorState";
+import {
+  editorReducer,
+  newElement,
+  splitLiveDataElements,
+  type Design,
+} from "./editorState";
 import { errorMessage, timeLabel } from "./ui";
 import { permitNavigation } from "./navigation";
 import { EmailWatch } from "./EmailWatch";
 
+type ResizeDirection = "ne" | "se" | "sw" | "nw";
+type ResizeEdges = {
+  left: boolean;
+  right: boolean;
+  top: boolean;
+  bottom: boolean;
+};
 type Gesture = {
   element: WidgetElement;
   x: number;
   y: number;
   mode: "move" | "resize";
+  edges?: ResizeEdges;
 };
+
+const resizeDirections: ResizeDirection[] = [
+  "ne",
+  "se",
+  "sw",
+  "nw",
+];
+
+const dataElementHeight = 0.25;
+const elementInset = 6;
+let textMeasurementContext: CanvasRenderingContext2D | null = null;
+
+function contentWidth(
+  text: string,
+  fontSize: number,
+  canvasWidth: number,
+) {
+  if (!textMeasurementContext)
+    textMeasurementContext = document.createElement("canvas").getContext("2d");
+  const context = textMeasurementContext;
+  if (!context) return 0.35;
+  context.font = `600 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  return Math.min(
+    0.8,
+    Math.max(0.04, (context.measureText(text).width + elementInset * 2) / canvasWidth),
+  );
+}
+
+function contentHeight(fontSize: number, canvasHeight: number) {
+  return Math.max(0.04, (fontSize * 1.15 + elementInset * 2) / canvasHeight);
+}
+
+function fittedElement(
+  element: WidgetElement,
+  fields: DataField[],
+  canvas: { width: number; height: number },
+  anchor: { horizontal: "left" | "center" | "right"; vertical: "top" | "center" | "bottom" } = {
+    horizontal: "center",
+    vertical: "center",
+  },
+): WidgetElement {
+  if (element.kind === "shape" || (element.kind === "text" && element.style.wrap))
+    return element;
+  const field =
+    element.kind === "data"
+      ? fields.find((item) => item.id === element.fieldId)
+      : undefined;
+  const text =
+    element.kind === "text"
+      ? element.text
+      : element.kind === "data"
+        ? formatValue(field, element.precision, element.showUnit)
+        : "";
+  const width =
+    element.kind === "icon"
+      ? (element.style.fontSize + elementInset * 2) / canvas.width
+      : contentWidth(text, element.style.fontSize, canvas.width);
+  const height =
+    element.kind === "icon"
+      ? (element.style.fontSize + elementInset * 2) / canvas.height
+      : contentHeight(element.style.fontSize, canvas.height);
+  const x =
+    anchor.horizontal === "left"
+      ? element.frame.x
+      : anchor.horizontal === "right"
+        ? element.frame.x + element.frame.width - width
+        : element.frame.x + (element.frame.width - width) / 2;
+  const y =
+    anchor.vertical === "top"
+      ? element.frame.y
+      : anchor.vertical === "bottom"
+        ? element.frame.y + element.frame.height - height
+        : element.frame.y + (element.frame.height - height) / 2;
+  return { ...element, frame: clampFrame({ x, y, width, height }) };
+}
+
+function dataElements(
+  field: Doc<"sources">["fields"][number],
+  color: string,
+  canvas: { width: number; height: number },
+  position = { x: 0.1, y: 0.35 },
+): {
+  frame: WidgetElement["frame"];
+  labelHeight: number;
+  valueHeight: number;
+  gap: number;
+  elements: WidgetElement[];
+} {
+  const label = formatDataFieldTitle(field.label);
+  const labelWidth = contentWidth(label, 12, canvas.width);
+  const valueWidth = contentWidth(formatValue(field), 28, canvas.width);
+  const labelHeight = contentHeight(12, canvas.height);
+  const valueHeight = contentHeight(28, canvas.height);
+  const gap = 0.01;
+  const group = clampFrame({
+    ...position,
+    width: Math.max(labelWidth, valueWidth),
+    height: labelHeight + valueHeight + gap,
+  });
+  const title = newElement("text", color, undefined, position) as Extract<
+    WidgetElement,
+    { kind: "text" }
+  >;
+  const value = newElement("data", color, field, position) as Extract<
+    WidgetElement,
+    { kind: "data" }
+  >;
+  return {
+    frame: group,
+    labelHeight,
+    valueHeight,
+    gap,
+    elements: [
+      {
+        ...title,
+        text: label,
+        frame: {
+          x: group.x + (group.width - labelWidth) / 2,
+          y: group.y,
+          width: labelWidth,
+          height: labelHeight,
+        },
+        style: {
+          ...title.style,
+          fontSize: 12,
+          fontWeight: 600 as const,
+          align: "center" as const,
+        },
+      },
+      {
+        ...value,
+        label,
+        showLabel: false,
+        frame: {
+          x: group.x + (group.width - valueWidth) / 2,
+          y: group.y + labelHeight + gap,
+          width: valueWidth,
+          height: valueHeight,
+        },
+        style: { ...value.style, align: "center" as const },
+      },
+    ],
+  };
+}
+
+function newElementColor(definition: WidgetDefinitionV1) {
+  if (definition.theme === "light") return "#111111";
+  if (definition.theme === "dark") return "#ffffff";
+  const color = Number.parseInt(definition.background.slice(1), 16);
+  const red = color >> 16;
+  const green = (color >> 8) & 255;
+  const blue = color & 255;
+  return red * 0.299 + green * 0.587 + blue * 0.114 > 150
+    ? "#111111"
+    : "#ffffff";
+}
 
 export function WidgetEditor({
   source,
@@ -58,15 +229,19 @@ export function WidgetEditor({
   widget?: Doc<"widgets">;
   onBack: () => void;
 }) {
+  const normalizedDefinition = splitLiveDataElements(initialDefinition);
+  const normalizedCanvas = sizes[normalizedDefinition.size];
   const initial: Design = {
     name: widget?.name ?? source.title,
     definition: {
-      ...initialDefinition,
-      elements: initialDefinition.elements.map((element) =>
-        element.kind === "data"
-          ? { ...element, label: formatDataFieldTitle(element.label) }
-          : element,
-      ),
+      ...normalizedDefinition,
+      elements: normalizedDefinition.elements.map((element) => {
+        const normalizedElement =
+          element.kind === "data"
+            ? { ...element, label: formatDataFieldTitle(element.label) }
+            : element;
+        return fittedElement(normalizedElement, source.fields, normalizedCanvas);
+      }),
     },
   };
   const [state, dispatch] = useReducer(editorReducer, {
@@ -82,9 +257,8 @@ export function WidgetEditor({
     widget ? { widgetId: widget._id, revision: widget.revision } : null,
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [previewFrame, setPreviewFrame] = useState<
-    WidgetElement["frame"] | null
-  >(null);
+  const [previewElement, setPreviewElement] =
+    useState<WidgetElement | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -96,6 +270,8 @@ export function WidgetEditor({
   const [viewportWidth, setViewportWidth] = useState(480);
   const canvasContainer = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
+  const fieldGrab = useRef({ x: 0.5, y: 0.5 });
+  const draggedFrame = useRef({ width: 0.35, height: dataElementHeight });
   const save = useMutation(api.widgets.save);
   const refresh = useMutation(api.sources.requestRefresh);
   const { name, definition } = state.present;
@@ -103,6 +279,7 @@ export function WidgetEditor({
     (element) => element.id === selectedId,
   );
   const dirty = JSON.stringify(state.present) !== JSON.stringify(saved);
+  const staleFields = source.fields.some((field) => field.stale);
   const canvas = sizes[definition.size];
   const previewWidth = Math.min(
     viewportWidth,
@@ -110,12 +287,12 @@ export function WidgetEditor({
   );
   const scale = previewWidth / canvas.width;
   const renderedDefinition =
-    previewFrame && selectedId
+    previewElement
       ? {
           ...definition,
           elements: definition.elements.map((element) =>
-            element.id === selectedId
-              ? { ...element, frame: previewFrame }
+            element.id === previewElement.id
+              ? previewElement
               : element,
           ),
         }
@@ -146,6 +323,35 @@ export function WidgetEditor({
     window.addEventListener("widget-now:navigate", confirm);
     return () => window.removeEventListener("widget-now:navigate", confirm);
   }, [dirty, saving]);
+  useEffect(() => {
+    const removeWithBackspace = (event: KeyboardEvent) => {
+      if (event.key !== "Backspace" || saving || !selectedId) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      )
+        return;
+      event.preventDefault();
+      dispatch({
+        type: "change",
+        design: {
+          name,
+          definition: {
+            ...definition,
+            elements: definition.elements.filter(
+              (element) => element.id !== selectedId,
+            ),
+          },
+        },
+      });
+      setNotice(null);
+      setSelectedId(null);
+    };
+    window.addEventListener("keydown", removeWithBackspace);
+    return () => window.removeEventListener("keydown", removeWithBackspace);
+  }, [definition, name, saving, selectedId]);
 
   function change(next: WidgetDefinitionV1) {
     dispatch({ type: "change", design: { name, definition: next } });
@@ -164,21 +370,56 @@ export function WidgetEditor({
     fieldId?: string,
     position?: { x: number; y: number },
   ) {
+    if (kind === "data") {
+      if (definition.elements.length > 58) {
+        setError("A widget can have up to 60 elements.");
+        return;
+      }
+      const field = source.fields.find((item) => item.id === fieldId);
+      if (!field) return;
+      const added = dataElements(
+        field,
+        newElementColor(definition),
+        canvas,
+        position,
+      ).elements;
+      change({ ...definition, elements: [...definition.elements, ...added] });
+      setSelectedId(added[1].id);
+      if (window.matchMedia("(max-width: 850px)").matches)
+        setMobilePanel("canvas");
+      return;
+    }
     if (definition.elements.length >= 60) {
       setError("A widget can have up to 60 elements.");
       return;
     }
-    const field = source.fields.find((item) => item.id === fieldId);
-    const element = newElement(
+    const nextElement = newElement(
       kind,
-      definition.theme === "light" ? "#111111" : "#ffffff",
-      field,
+      newElementColor(definition),
+      undefined,
       position,
     );
+    const element = fittedElement(nextElement, source.fields, canvas);
     change({ ...definition, elements: [...definition.elements, element] });
     setSelectedId(element.id);
-    if (kind === "data" && window.matchMedia("(max-width: 850px)").matches)
-      setMobilePanel("canvas");
+  }
+  function dragPosition(
+    event: DragEvent<HTMLDivElement>,
+    target: HTMLDivElement,
+  ) {
+    const rect = target.getBoundingClientRect();
+    return {
+      x:
+        (event.clientX - rect.left) / rect.width -
+        draggedFrame.current.width * fieldGrab.current.x,
+      y:
+        (event.clientY - rect.top) / rect.height -
+        draggedFrame.current.height * fieldGrab.current.y,
+    };
+  }
+  function endFieldDrag() {
+    setDraggingFieldId(null);
+    setDropOverWidget(false);
   }
   function removeSelected() {
     change({
@@ -200,39 +441,84 @@ export function WidgetEditor({
   function beginGesture(
     event: PointerEvent<HTMLDivElement>,
     element: WidgetElement,
-    mode: Gesture["mode"],
+    direction?: ResizeDirection,
   ) {
     if (saving) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     setSelectedId(element.id);
-    gesture.current = { element, mode, x: event.clientX, y: event.clientY };
+    gesture.current = {
+      element,
+      mode: direction ? "resize" : "move",
+      ...(direction
+        ? {
+            edges: {
+              left: direction.includes("w"),
+              right: direction.includes("e"),
+              top: direction.includes("n"),
+              bottom: direction.includes("s"),
+            },
+          }
+        : {}),
+      x: event.clientX,
+      y: event.clientY,
+    };
   }
   function moveFrame(event: PointerEvent<HTMLDivElement>) {
     const current = gesture.current;
     if (!current) return null;
     const dx = (event.clientX - current.x) / previewWidth;
     const dy = (event.clientY - current.y) / (canvas.height * scale);
-    return clampFrame(
-      current.mode === "move"
-        ? {
-            ...current.element.frame,
-            x: current.element.frame.x + dx,
-            y: current.element.frame.y + dy,
-          }
-        : {
-            ...current.element.frame,
-            width: Math.min(
-              1 - current.element.frame.x,
-              current.element.frame.width + dx,
-            ),
-            height: Math.min(
-              1 - current.element.frame.y,
-              current.element.frame.height + dy,
-            ),
-          },
-    );
+    if (current.mode === "move")
+      return clampFrame({
+        ...current.element.frame,
+        x: current.element.frame.x + dx,
+        y: current.element.frame.y + dy,
+      });
+    const edges = current.edges!;
+    const frame = current.element.frame;
+    let left = frame.x;
+    let right = frame.x + frame.width;
+    let top = frame.y;
+    let bottom = frame.y + frame.height;
+    if (edges.left) left = Math.max(0, Math.min(right - 0.04, left + dx));
+    if (edges.right) right = Math.min(1, Math.max(left + 0.04, right + dx));
+    if (edges.top) top = Math.max(0, Math.min(bottom - 0.04, top + dy));
+    if (edges.bottom) bottom = Math.min(1, Math.max(top + 0.04, bottom + dy));
+    return { x: left, y: top, width: right - left, height: bottom - top };
+  }
+  function resizeElement(
+    element: WidgetElement,
+    frame: WidgetElement["frame"],
+    current: Gesture,
+  ): WidgetElement {
+    if (current.mode === "move" || element.kind === "shape")
+      return { ...element, frame };
+    const edges = current.edges!;
+    const widthScale = frame.width / element.frame.width;
+    const heightScale = frame.height / element.frame.height;
+    const scaleFactor =
+      edges.left || edges.right
+        ? edges.top || edges.bottom
+          ? Math.sqrt(widthScale * heightScale)
+          : widthScale
+        : heightScale;
+    const resized = {
+      ...element,
+      frame,
+      style: {
+        ...element.style,
+        fontSize: Math.max(
+          8,
+          Math.min(160, Math.round(element.style.fontSize * scaleFactor)),
+        ),
+      },
+    };
+    return fittedElement(resized, source.fields, canvas, {
+      horizontal: edges.left ? "right" : edges.right ? "left" : "center",
+      vertical: edges.top ? "bottom" : edges.bottom ? "top" : "center",
+    });
   }
   async function saveDesign() {
     setSaving(true);
@@ -335,6 +621,40 @@ export function WidgetEditor({
           {notice}
         </div>
       )}
+      <div className="editor-live-bar">
+        <div className="editor-live-status">
+          <span className={`live-dot ${staleFields ? "stale-dot" : ""}`} />
+          <span>{staleFields ? "Stale data" : "Live data"}</span>
+          <span className="editor-live-updated">
+            {source.refreshing
+              ? "Refreshing…"
+              : `Updated ${timeLabel(source.lastSuccessAt)}`}
+          </span>
+        </div>
+        <div className="editor-live-actions">
+          <button
+            className="secondary"
+            disabled={saving || !target || source.refreshing}
+            onClick={() => {
+              void refresh({ sourceId: source._id }).catch((err: unknown) =>
+                setError(errorMessage(err)),
+              );
+            }}
+          >
+            <RefreshCw
+              size={15}
+              className={source.refreshing ? "spin" : ""}
+            />
+            {source.refreshing ? "Refreshing…" : "Refresh now"}
+          </button>
+          <EmailWatch
+            widgetId={target?.widgetId ?? null}
+            fields={source.fields}
+            onSaveWidget={saveDesign}
+            disabled={saving}
+          />
+        </div>
+      </div>
       <div
         className="editor-mobile-tabs"
         role="tablist"
@@ -372,32 +692,95 @@ export function WidgetEditor({
                   (element) =>
                     element.kind === "data" && element.fieldId === field.id,
                 );
+                const layout = dataElements(
+                  field,
+                  newElementColor(definition),
+                  canvas,
+                );
                 return (
                   <button
                     key={field.id}
                     type="button"
-                    className={`field-card ${used ? "field-used" : ""}`}
+                    className={`field-card ${used ? "field-used" : ""} ${draggingFieldId === field.id ? "field-dragging" : ""}`}
                     aria-label={`Add ${formatDataFieldTitle(field.label)}: ${formatValue(field)}`}
                     title="Click to add or drag onto the widget"
                     onClick={() => add("data", field.id)}
                     draggable
                     onDragStart={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      fieldGrab.current = {
+                        x: Math.max(
+                          0,
+                          Math.min(
+                            1,
+                            (event.clientX - rect.left) / rect.width,
+                          ),
+                        ),
+                        y: Math.max(
+                          0,
+                          Math.min(
+                            1,
+                            (event.clientY - rect.top) / rect.height,
+                          ),
+                        ),
+                      };
                       event.dataTransfer.setData(
                         "application/widget-field",
                         field.id,
                       );
                       event.dataTransfer.effectAllowed = "copy";
+                      const image = event.currentTarget.querySelector(
+                        ".field-native-drag-image",
+                      ) as HTMLElement;
+                      draggedFrame.current = {
+                        width: layout.frame.width,
+                        height: layout.frame.height,
+                      };
+                      event.dataTransfer.setDragImage(
+                        image,
+                        image.offsetWidth * fieldGrab.current.x,
+                        image.offsetHeight * fieldGrab.current.y,
+                      );
                       setDraggingFieldId(field.id);
                     }}
-                    onDragEnd={() => {
-                      setDraggingFieldId(null);
-                      setDropOverWidget(false);
-                    }}
+                    onDragEnd={endFieldDrag}
                   >
                     <span className="field-title">
                       {formatDataFieldTitle(field.label)}
                     </span>
                     <strong>{formatValue(field)}</strong>
+                    <span
+                      className="field-native-drag-image"
+                      aria-hidden="true"
+                      style={{
+                        width:
+                          previewWidth * layout.frame.width,
+                        height:
+                          canvas.height * scale * layout.frame.height,
+                        color: newElementColor(definition),
+                        background: "transparent",
+                        fontSize: 28 * scale,
+                        fontWeight: 600,
+                        textAlign: "center",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12 * scale,
+                          height: canvas.height * scale * layout.labelHeight,
+                        }}
+                      >
+                        {formatDataFieldTitle(field.label)}
+                      </span>
+                      <strong
+                        style={{
+                          height: canvas.height * scale * layout.valueHeight,
+                          marginTop: canvas.height * scale * layout.gap,
+                        }}
+                      >
+                        {formatValue(field)}
+                      </strong>
+                    </span>
                   </button>
                 );
               })}
@@ -407,9 +790,8 @@ export function WidgetEditor({
               <a href={source.url} target="_blank" rel="noreferrer">
                 {new URL(source.url).hostname} ↗
               </a>
-              <p>Last updated {timeLabel(source.lastSuccessAt)}</p>
               {!target && <p>Refresh starts after saving</p>}
-              {source.fields.some((field) => field.stale) && (
+              {staleFields && (
                 <p className="stale">
                   Some values are stale. Showing their last successful
                   observations.
@@ -423,26 +805,6 @@ export function WidgetEditor({
                   {source.refreshError}
                 </p>
               )}
-              <button
-                className="secondary"
-                disabled={!target || source.refreshing}
-                onClick={() => {
-                  void refresh({ sourceId: source._id }).catch((err: unknown) =>
-                    setError(errorMessage(err)),
-                  );
-                }}
-              >
-                <RefreshCw
-                  size={14}
-                  className={source.refreshing ? "spin" : ""}
-                />
-                {source.refreshing ? "Refreshing…" : "Refresh now"}
-              </button>
-              <EmailWatch
-                widgetId={target?.widgetId ?? null}
-                fields={source.fields}
-                onSaveWidget={saveDesign}
-              />
             </div>
           </aside>
           <section className="canvas-panel">
@@ -481,24 +843,28 @@ export function WidgetEditor({
                   }
                 }}
                 onDragLeave={(event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
                   if (
-                    !event.currentTarget.contains(event.relatedTarget as Node)
-                  )
+                    event.clientX < rect.left ||
+                    event.clientX > rect.right ||
+                    event.clientY < rect.top ||
+                    event.clientY > rect.bottom
+                  ) {
                     setDropOverWidget(false);
+                  }
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
-                  setDropOverWidget(false);
-                  setDraggingFieldId(null);
                   const id = event.dataTransfer.getData(
                     "application/widget-field",
                   );
-                  if (!source.fields.some((field) => field.id === id)) return;
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  add("data", id, {
-                    x: (event.clientX - rect.left) / rect.width - 0.275,
-                    y: (event.clientY - rect.top) / rect.height - 0.125,
-                  });
+                  if (source.fields.some((field) => field.id === id))
+                    add(
+                      "data",
+                      id,
+                      dragPosition(event, event.currentTarget),
+                    );
+                  endFieldDrag();
                 }}
               >
                 <WidgetRenderer
@@ -508,8 +874,8 @@ export function WidgetEditor({
                   selectedId={selectedId}
                   renderOverlay={(element) => {
                     const frame =
-                      selectedId === element.id && previewFrame
-                        ? previewFrame
+                      selectedId === element.id && previewElement
+                        ? previewElement.frame
                         : element.frame;
                     return (
                       <div
@@ -529,35 +895,49 @@ export function WidgetEditor({
                           beginGesture(
                             event,
                             element,
-                            (event.target as HTMLElement).classList.contains(
-                              "resize-handle",
-                            )
-                              ? "resize"
-                              : "move",
+                            (event.target as HTMLElement).closest<HTMLElement>(
+                              "[data-resize]",
+                            )?.dataset.resize as ResizeDirection | undefined,
                           )
                         }
                         onPointerMove={(event) => {
                           const frame = moveFrame(event);
-                          if (frame) setPreviewFrame(frame);
+                          if (gesture.current && frame)
+                            setPreviewElement(
+                              resizeElement(
+                                gesture.current.element,
+                                frame,
+                                gesture.current,
+                              ),
+                            );
                         }}
                         onPointerUp={(event) => {
                           const frame = moveFrame(event);
                           if (gesture.current && frame)
-                            editElement({
-                              ...gesture.current.element,
-                              frame,
-                            });
+                            editElement(
+                              resizeElement(
+                                gesture.current.element,
+                                frame,
+                                gesture.current,
+                              ),
+                            );
                           gesture.current = null;
-                          setPreviewFrame(null);
+                          setPreviewElement(null);
                         }}
                         onPointerCancel={() => {
                           gesture.current = null;
-                          setPreviewFrame(null);
+                          setPreviewElement(null);
                         }}
                       >
-                        {selectedId === element.id && (
-                          <span className="resize-handle" aria-hidden="true" />
-                        )}
+                        {selectedId === element.id &&
+                          resizeDirections.map((direction) => (
+                            <span
+                              key={direction}
+                              className={`resize-handle resize-${direction}`}
+                              data-resize={direction}
+                              aria-hidden="true"
+                            />
+                          ))}
                       </div>
                     );
                   }}
@@ -694,31 +1074,6 @@ export function WidgetEditor({
                           </option>
                         ))}
                       </select>
-                    </Property>
-                    <Property label="Display label">
-                      <input
-                        aria-label="Display label"
-                        value={selected.label}
-                        maxLength={200}
-                        onChange={(event) =>
-                          editElement({
-                            ...selected,
-                            label: event.target.value,
-                          })
-                        }
-                      />
-                    </Property>
-                    <Property label="Show label">
-                      <input
-                        type="checkbox"
-                        checked={selected.showLabel}
-                        onChange={(event) =>
-                          editElement({
-                            ...selected,
-                            showLabel: event.target.checked,
-                          })
-                        }
-                      />
                     </Property>
                     <Property label="Show unit">
                       <input

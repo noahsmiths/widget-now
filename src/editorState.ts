@@ -89,3 +89,39 @@ export function newElement(
       };
   }
 }
+
+export function splitLiveDataElements(
+  definition: WidgetDefinitionV1,
+): WidgetDefinitionV1 {
+  return {
+    ...definition,
+    elements: definition.elements.flatMap((element) => {
+      if (element.kind !== "data" || !element.showLabel) return [element];
+      const labelHeight = Math.min(
+        0.12,
+        Math.max(0.04, element.frame.height * 0.36),
+      );
+      return [
+        {
+          id: crypto.randomUUID(),
+          kind: "text" as const,
+          text: formatDataFieldTitle(element.label),
+          frame: clampFrame({ ...element.frame, height: labelHeight }),
+          style: {
+            ...element.style,
+            fontSize: Math.max(8, element.style.fontSize * 0.36),
+          },
+        },
+        {
+          ...element,
+          showLabel: false,
+          frame: clampFrame({
+            ...element.frame,
+            y: element.frame.y + labelHeight,
+            height: Math.max(0.04, element.frame.height - labelHeight),
+          }),
+        },
+      ];
+    }),
+  };
+}

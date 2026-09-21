@@ -80,6 +80,7 @@ export function WidgetRenderer({
             textAlign: style.align,
             opacity: style.opacity,
             whiteSpace: style.wrap ? "pre-wrap" : "nowrap",
+            padding: element.kind === "shape" ? 0 : 6,
           };
           const field =
             element.kind === "data"
@@ -89,8 +90,8 @@ export function WidgetRenderer({
           const iconSize = Icon
             ? Math.min(
                 style.fontSize,
-                frame.width * canvas.width,
-                frame.height * canvas.height,
+                Math.max(0, frame.width * canvas.width - 12),
+                Math.max(0, frame.height * canvas.height - 12),
               )
             : null;
           return (

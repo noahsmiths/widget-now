@@ -16,10 +16,12 @@ export function EmailWatch({
   widgetId,
   fields,
   onSaveWidget,
+  disabled,
 }: {
   widgetId: Id<"widgets"> | null;
   fields: DataField[];
   onSaveWidget: () => Promise<Id<"widgets">>;
+  disabled: boolean;
 }) {
   const data = useQuery(api.watches.get, widgetId ? { widgetId } : "skip");
   const [open, setOpen] = useState(false);
@@ -125,6 +127,7 @@ export function EmailWatch({
         type="button"
         className="watch-trigger"
         aria-haspopup="dialog"
+        disabled={disabled}
         onClick={() => {
           setError(null);
           setNotice(null);
