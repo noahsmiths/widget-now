@@ -17,8 +17,6 @@ export const commandValidator = v.object({
   kind: v.union(
     v.literal("confirm"),
     v.literal("pause"),
-    v.literal("resume"),
-    v.literal("latest"),
     v.literal("update"),
     v.literal("help"),
   ),

@@ -20,7 +20,7 @@ const conditionSchema = z.object({
   target: z.union([z.string(), z.number(), z.boolean(), z.null()]),
 });
 const commandSchema = z.object({
-  kind: z.enum(["confirm", "pause", "resume", "latest", "update", "help"]),
+  kind: z.enum(["confirm", "pause", "update", "help"]),
   condition: conditionSchema.nullable(),
 });
 
@@ -47,7 +47,7 @@ async function parseInstruction(
     { userId: ownerId },
     {
       schema: commandSchema,
-      prompt: `Supported commands: confirm, pause (including unsubscribe/stop), resume, latest (last observed value), update (one condition on one existing field), help (ambiguous, unsupported, compound, or irrelevant request). For update, use changed with null target, contains with a nonempty string target on a text field, strict above/below with numeric target, or equals with a target matching the field type. Convert units only when the conversion is unambiguous; otherwise return help. Preserve exact field IDs. If modifying only a threshold, preserve the current field and operator unless asked otherwise. Never interpret requests to edit source values, widget design, recipient, or URLs as updates. No schedules, percentage changes, compound conditions, or new fields. When unsure, return help with null condition. Every non-update command must have null condition.\nExisting condition: ${JSON.stringify(current)}\nAvailable fields: ${JSON.stringify(fields.map(({ id, label, description, type, unit, value }) => ({ id, label, description, type, unit, value })))}\nUser instruction: ${JSON.stringify(instruction)}`,
+      prompt: `Supported commands: confirm, pause (including unsubscribe/stop), update (one condition on one existing field), help (ambiguous, unsupported, compound, or irrelevant request). For update, use changed with null target, contains with a nonempty string target on a text field, strict above/below with numeric target, or equals with a target matching the field type. Convert units only when the conversion is unambiguous; otherwise return help. Preserve exact field IDs. If modifying only a threshold, preserve the current field and operator unless asked otherwise. Never interpret requests to edit source values, widget design, recipient, or URLs as updates. Resuming a stopped watch and requesting the latest value are unsupported through email. No schedules, percentage changes, compound conditions, or new fields. When unsure, return help with null condition. Every non-update command must have null condition.\nExisting condition: ${JSON.stringify(current)}\nAvailable fields: ${JSON.stringify(fields.map(({ id, label, description, type, unit, value }) => ({ id, label, description, type, unit, value })))}\nUser instruction: ${JSON.stringify(instruction)}`,
     },
   );
   if (result.object.kind === "update") {
@@ -80,9 +80,6 @@ export const interpret = internalAction({
         pause: "pause",
         stop: "pause",
         unsubscribe: "pause",
-        resume: "resume",
-        latest: "latest",
-        status: "latest",
         help: "help",
       } as Record<string, WatchCommand["kind"]>
     )[exact];

@@ -66,7 +66,7 @@ Newly discovered data fields require a new generation in v1. The field catalog d
 
 ## Email watches
 
-Widgets have an optional “Email me when…” control below the source's refresh controls. Choose a live data field and condition, review the rule, and send a confirmation to your account's email address. New widgets can be saved from this flow before setting up the watch. Reply CONFIRM to activate the watch. Widgets and generation work without AgentMail configuration.
+Widgets have an optional email notification control. Choose a live data field and condition to activate it for your account's email address. New widgets can be saved from this flow before setting up the watch. Widgets and generation work without AgentMail configuration.
 
 The integration uses the official `agentmail` Node SDK inside Convex Node actions, not the AgentMail Convex component. Configure the personal development deployment:
 
@@ -79,9 +79,9 @@ The setup script reuses the existing `widgetnow@agentmail.to` inbox and creates 
 
 Watches support a field changing, text containing a phrase, strict greater/less numeric thresholds, or equality with a string/boolean/number. Text contains checks ignore case; string equality ignores case and surrounding whitespace. Convex validates and evaluates rules. OpenAI interprets instructions only when changing a watch by email reply. The initial value establishes a baseline, so enabling, resuming, or editing a watch does not immediately alert on an already-true condition. A threshold/match watch alerts when its condition changes from false to true; a change watch alerts on each observed value change. Missing or stale fields do not update the baseline or trigger mail.
 
-Reply PAUSE (or STOP/UNSUBSCRIBE), RESUME, LATEST, or describe a new condition in any watch email. LATEST reports the stored observation with its timestamp and stale status, rather than claiming a new scrape. Signed webhooks are acknowledged after durably scheduling processing. Replies are matched to a known thread and the account email, checked for spam/unauthenticated/automatic mail, and deduplicated by message ID. Reply commands cannot change recipients, source values, URLs, designs, or refresh schedules.
+Reply STOP (or PAUSE/UNSUBSCRIBE) or describe a new condition in any watch email. Stopped conditions can be reactivated in Widget Now. Signed webhooks are acknowledged after durably scheduling processing. Replies are matched to a known thread and the account email, checked for spam/unauthenticated/automatic mail, and deduplicated by message ID. Reply commands cannot change recipients, source values, URLs, designs, or refresh schedules.
 
-Alert evaluation and delivery run separately from source refresh. Mail has its own Convex Workflow component and workpool, so slow deliveries/replies do not occupy widget generation or refresh slots. Delivery uses workflow retries and stable AgentMail `Idempotency-Key` headers on sends and replies. Failed delivery is shown in the watch panel and does not affect widgets. Pending confirmations can be resent after five minutes. Removing a widget/source removes its watches and schedules bounded cleanup of mail history.
+Alert evaluation and delivery run separately from source refresh. Mail has its own Convex Workflow component and workpool, so slow deliveries/replies do not occupy widget generation or refresh slots. Delivery uses workflow retries and stable AgentMail `Idempotency-Key` headers on sends and replies. Failed delivery is shown in the watch panel and does not affect widgets. Removing a widget/source removes its watches and schedules bounded cleanup of mail history.
 
 ## Validation
 

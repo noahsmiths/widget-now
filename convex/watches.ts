@@ -193,7 +193,7 @@ export async function evaluateSourceWatches(
       watch,
       "alert",
       `${widget.name} · ${describeCondition(watch.condition, fields)}`,
-      `${describeCondition(watch.condition, fields)}.\n\nPrevious: ${formatValue({ ...field, value: watch.lastValue }, 2)}\nNow: ${formatValue(field, 2)}\nObserved: ${new Date(field.observedAt!).toISOString()}\n\nSource evidence: ${field.excerpt}\nSource: ${source.url}\nOpen widget: ${widgetLink(widget._id)}\n\nReply PAUSE to stop alerts, RESUME to restart, LATEST for the last observed value, or describe a new condition.`,
+      `${describeCondition(watch.condition, fields)}.\n\nPrevious: ${formatValue({ ...field, value: watch.lastValue }, 2)}\nNow: ${formatValue(field, 2)}\n\nSource: ${source.url}\nOpen widget: ${widgetLink(widget._id)}\n\nReply "Stop" to stop emails or reply with an edit to this condition.`,
     );
   }
 }

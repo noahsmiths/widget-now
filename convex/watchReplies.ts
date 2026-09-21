@@ -8,7 +8,6 @@ import {
   describeCondition,
   validateCondition,
 } from "../shared/watch";
-import { formatValue } from "../shared/widget";
 import { baseline } from "./watches";
 import { queueEmail, widgetLink } from "./watchMail";
 import { vResultValidator, vWorkflowId } from "@convex-dev/workflow";
@@ -110,21 +109,7 @@ export const apply = internalMutation({
       await ctx.db.patch("watches", watch._id, patch);
       updated = { ...watch, ...patch };
       text =
-        "Your email watch is paused. Your widget will keep refreshing. Reply RESUME to restart alerts.";
-    } else if (command.kind === "resume") {
-      const patch = {
-        enabled: true,
-        revision: watch.revision + 1,
-        ...baseline(watch.condition, source.fields),
-      };
-      await ctx.db.patch("watches", watch._id, patch);
-      updated = { ...watch, ...patch };
-      text = `Your email watch is active again: ${describeCondition(watch.condition, source.fields)}. I'll watch for future changes or crossings.`;
-    } else if (command.kind === "latest") {
-      const field = source.fields.find(
-        (item) => item.id === watch.condition.fieldId,
-      );
-      text = `Latest observed ${field?.label ?? "value"}: ${formatValue(field, 2)}.\nObserved: ${field?.observedAt != null ? new Date(field.observedAt).toISOString() : "not available"}.${field?.stale ? "\nThis value is stale; it is the last successful observation." : ""}\nSource evidence: ${field?.excerpt ?? ""}\nSource: ${source.url}`;
+        "Emails for this condition are stopped. Your widget will keep refreshing. You can reactivate the condition in Widget Now.";
     } else if (command.kind === "update" && command.condition) {
       try {
         validateCondition(command.condition, source.fields);
@@ -141,7 +126,7 @@ export const apply = internalMutation({
           "I couldn't apply that condition. Use one existing field with a numeric threshold, a matching value, text it contains, or a value change.";
       }
     } else {
-      text = `Your watch is ${watch.enabled ? "active" : "paused"}: ${describeCondition(watch.condition, source.fields)}.\n\nReply PAUSE, RESUME, or LATEST. To change the condition, describe one field changing, crossing a numeric threshold, matching a value, or containing text. I can't edit widget designs, source values, recipients, or check schedules through email.`;
+      text = `Your watch is ${watch.enabled ? "active" : "stopped"}: ${describeCondition(watch.condition, source.fields)}.\n\nReply "Stop" to stop emails or describe an edit to this condition using one field changing, crossing a numeric threshold, matching a value, or containing text. I can't edit widget designs, source values, recipients, or check schedules through email.`;
     }
     await queueEmail(
       ctx,
