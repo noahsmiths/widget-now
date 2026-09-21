@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Smartphone,
   Trash2,
+  X,
 } from "lucide-react";
 import { api } from "../convex/_generated/api";
 import type { Doc, Id } from "../convex/_generated/dataModel";
@@ -151,17 +152,7 @@ function ProductApp() {
       ) : (
         <>
           <Unauthenticated>
-            <main className="auth-layout">
-              <div className="auth-story">
-                <h1>
-                  Websites you follow.
-                  <br />
-                  <em>In one place.</em>
-                </h1>
-                <p>Turn a public page into a live, editable widget.</p>
-              </div>
-              <SignInForm />
-            </main>
+            <SignedOutHome />
           </Unauthenticated>
           <Authenticated>
             <main className="workspace">
@@ -200,6 +191,105 @@ function ProductApp() {
         </>
       )}
     </div>
+  );
+}
+
+function SignedOutHome() {
+  const authDialog = useRef<HTMLDialogElement>(null);
+
+  return (
+    <>
+      <main className="home-showcase">
+        <section
+          className="home-transformation"
+          aria-label="A webpage transformed into a widget"
+        >
+          <h1 className="home-before-heading">Turn this…</h1>
+          <figure className="home-source-page">
+            <img
+              src="/showcase/stockx-product-page.png"
+              alt="StockX listing for the 2026 Pokémon Mega Evolution 30th Celebration Elite Trainer Box"
+            />
+          </figure>
+
+          <div className="home-transform-arrow" aria-hidden="true">
+            <svg viewBox="0 0 140 90" fill="none">
+              <path d="M8 68C35 74 42 34 68 43C91 51 97 18 125 25" />
+              <path d="M115 15L127 25L114 34" />
+            </svg>
+          </div>
+
+          <h2 className="home-after-heading">into this</h2>
+          <div className="phone-demo">
+            <div className="phone-screen">
+              <span className="phone-island" aria-hidden="true" />
+              <div className="phone-app-grid">
+                <article
+                  className="price-widget"
+                  aria-label="Example widget showing a current price of $170 and a last sold price of $238"
+                >
+                  <p className="price-widget-product">
+                    2026 Pokémon Mega Evolution 30th Celebration
+                    <span>Elite Trainer Box</span>
+                  </p>
+                  <div className="price-widget-prices">
+                    <div>
+                      <span>Current</span>
+                      <strong>$170</strong>
+                    </div>
+                    <div>
+                      <span>Last sold</span>
+                      <strong>$238</strong>
+                    </div>
+                  </div>
+                </article>
+                {Array.from({ length: 12 }, (_, index) => (
+                  <span className="phone-app" aria-hidden="true" key={index} />
+                ))}
+              </div>
+              <div className="phone-dock" aria-hidden="true">
+                {Array.from({ length: 4 }, (_, index) => (
+                  <span key={index} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <p className="home-pitch">
+            Tired of checking the same websites and dashboards over and over?
+            Widget Now lets you turn any website into a live widget, along with optional email alerts for when data changes.
+          </p>
+
+          <button
+            className="home-create-button"
+            onClick={() => authDialog.current?.showModal()}
+          >
+            Create my own widget
+            <ArrowRight size={17} />
+          </button>
+        </section>
+      </main>
+
+      <dialog
+        ref={authDialog}
+        className="auth-modal"
+        aria-label="Sign in to create a widget"
+        onClick={(event) => {
+          if (event.target === event.currentTarget) event.currentTarget.close();
+        }}
+      >
+        <div className="auth-modal-content">
+          <button
+            className="auth-modal-close"
+            aria-label="Close sign-in dialog"
+            onClick={() => authDialog.current?.close()}
+          >
+            <X size={18} />
+          </button>
+          <SignInForm />
+        </div>
+      </dialog>
+    </>
   );
 }
 

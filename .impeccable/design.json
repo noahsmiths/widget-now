@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-21T13:11:22Z",
+  "title": "Design System: Widget Now",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Pure Canvas",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#262626", "#404040", "#737373", "#a3a3a3", "#d4d4d4", "#e5e5e5", "#f5f5f5", "#ffffff"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Interface Ink",
+        "canonical": "#111111",
+        "tonalRamp": ["#111111", "#262626", "#525252", "#737373", "#a3a3a3", "#d4d4d4", "#e5e5e5", "#fafafa"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Soft Grey Surface",
+        "canonical": "#f3f3f3",
+        "tonalRamp": ["#171717", "#404040", "#737373", "#a3a3a3", "#d4d4d4", "#e5e5e5", "#f3f3f3", "#fafafa"]
+      },
+      "surface-soft": {
+        "role": "neutral",
+        "displayName": "Quiet Grey Surface",
+        "canonical": "#f7f7f7",
+        "tonalRamp": ["#171717", "#404040", "#737373", "#a3a3a3", "#d4d4d4", "#e5e5e5", "#f1f1f1", "#f7f7f7"]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Copy",
+        "canonical": "#666666",
+        "tonalRamp": ["#171717", "#262626", "#404040", "#666666", "#8a8a8a", "#b8b8b8", "#dedede", "#f5f5f5"]
+      },
+      "subdued": {
+        "role": "neutral",
+        "displayName": "Subdued Copy",
+        "canonical": "#737373",
+        "tonalRamp": ["#171717", "#2f2f2f", "#525252", "#737373", "#999999", "#bfbfbf", "#e0e0e0", "#f5f5f5"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Crisp Border",
+        "canonical": "#e5e5e5",
+        "tonalRamp": ["#1f1f1f", "#454545", "#737373", "#a3a3a3", "#c7c7c7", "#d9d9d9", "#e5e5e5", "#f7f7f7"]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Widget Blue",
+        "canonical": "#2563eb",
+        "tonalRamp": ["#172554", "#1e3a8a", "#1e40af", "#1d4ed8", "#2563eb", "#60a5fa", "#bfdbfe", "#eff6ff"]
+      },
+      "accent-strong": {
+        "role": "primary",
+        "displayName": "Deep Widget Blue",
+        "canonical": "#1d4ed8",
+        "tonalRamp": ["#172554", "#1e3a8a", "#1e40af", "#1d4ed8", "#2563eb", "#60a5fa", "#bfdbfe", "#eff6ff"]
+      },
+      "accent-soft": {
+        "role": "primary",
+        "displayName": "Blue Wash",
+        "canonical": "#eff6ff",
+        "tonalRamp": ["#172554", "#1e3a8a", "#1e40af", "#1d4ed8", "#2563eb", "#60a5fa", "#bfdbfe", "#eff6ff"]
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Danger Red",
+        "canonical": "#b42318",
+        "tonalRamp": ["#450a0a", "#7f1d1d", "#991b1b", "#b42318", "#dc2626", "#f87171", "#fecaca", "#fff4f2"]
+      },
+      "danger-soft": {
+        "role": "secondary",
+        "displayName": "Danger Wash",
+        "canonical": "#fff4f2",
+        "tonalRamp": ["#450a0a", "#7f1d1d", "#991b1b", "#b42318", "#dc2626", "#f87171", "#fecaca", "#fff4f2"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Largest persuasive statements and glanceable values."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page and section headings."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Component titles and compact card headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Instructions, descriptions, and working copy."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Metadata, status, field hints, and utility cues."
+      }
+    },
+    "shadows": [
+      {
+        "name": "control-lift",
+        "value": "0 3px 7px #1111110c",
+        "purpose": "Minimal depth under filled primary controls."
+      },
+      {
+        "name": "menu-lift",
+        "value": "0 14px 30px #11111116",
+        "purpose": "Floating menus and transient panels."
+      },
+      {
+        "name": "widget-lift",
+        "value": "0 10px 22px #11111110",
+        "purpose": "Widget previews and saved widget surfaces."
+      },
+      {
+        "name": "dialog-lift",
+        "value": "0 26px 70px #11111136",
+        "purpose": "Modal content over a dimmed backdrop."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-fast",
+        "value": "150ms ease",
+        "purpose": "Default button, surface, and shadow transitions."
+      },
+      {
+        "name": "lift-fast",
+        "value": "150ms ease-out",
+        "purpose": "Small hover and preview translations."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "620px"
+      },
+      {
+        "name": "compact",
+        "value": "850px"
+      },
+      {
+        "name": "wide",
+        "value": "1500px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Routine high-priority product action with near-black fill.",
+      "html": "<button class=\"ds-btn-primary\">Create widget <svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m13 6 6 6-6 6\"/></svg></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 12px 17px; border: 0; border-radius: 8px; background: var(--color-ink, #111111); color: #fff; font: 500 12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; box-shadow: 0 3px 7px #1111110c; cursor: pointer; transition: background 0.15s, box-shadow 0.15s, transform 0.15s; } .ds-btn-primary:hover { background: #2a2a2a; box-shadow: 0 4px 10px #11111122; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 3px solid var(--color-accent, #2563eb); outline-offset: 4px; }"
+    },
+    {
+      "name": "Accent Button",
+      "kind": "button",
+      "refersTo": "button-accent",
+      "description": "Singular persuasive or activation action using Widget Blue.",
+      "html": "<button class=\"ds-btn-accent\">Create my own widget <svg viewBox=\"0 0 24 24\" width=\"17\" height=\"17\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m13 6 6 6-6 6\"/></svg></button>",
+      "css": ".ds-btn-accent { min-height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 0 22px; border: 0; border-radius: 10px; background: var(--color-accent, #2563eb); color: #fff; font: 650 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; box-shadow: 0 8px 20px #2563eb24; cursor: pointer; transition: background 0.15s, box-shadow 0.15s, transform 0.15s; } .ds-btn-accent:hover { background: var(--color-accent-strong, #1d4ed8); box-shadow: 0 10px 24px #2563eb35; transform: translateY(-1px); } .ds-btn-accent:active { transform: translateY(0); } .ds-btn-accent:focus-visible { outline: 3px solid var(--color-accent, #2563eb); outline-offset: 4px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Reversible or lower-priority action on a soft neutral surface.",
+      "html": "<button class=\"ds-btn-secondary\">Continue with GitHub</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 12px 17px; border: 1px solid var(--color-border, #e5e5e5); border-radius: 8px; background: var(--color-secondary, #f3f3f3); color: var(--color-ink, #111111); font: 500 12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; cursor: pointer; transition: background 0.15s, transform 0.15s; } .ds-btn-secondary:hover { background: #e9e9e9; } .ds-btn-secondary:active { transform: translateY(1px); } .ds-btn-secondary:focus-visible { outline: 3px solid var(--color-accent, #2563eb); outline-offset: 4px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "Compact white field with a crisp border and blue focus treatment.",
+      "html": "<label class=\"ds-field-label\">Website URL<input class=\"ds-field\" type=\"url\" placeholder=\"https://example.com/product\"></label>",
+      "css": ".ds-field-label { display: grid; gap: 9px; color: var(--color-ink, #111111); font: 500 12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-field { width: 100%; padding: 11px 13px; border: 1px solid var(--color-border, #e5e5e5); border-radius: 9px; background: #fff; color: var(--color-ink, #111111); font: 400 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-field::placeholder { color: var(--color-muted, #666666); } .ds-field:hover { border-color: #d4d4d4; } .ds-field:focus { outline: 2px solid var(--color-accent, #2563eb); outline-offset: 1px; }"
+    },
+    {
+      "name": "Header Navigation",
+      "kind": "nav",
+      "description": "White, bottom-bordered product header with a blue active state.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Primary\"><span class=\"ds-brand\">widget<span>now</span></span><button class=\"ds-nav-item ds-nav-active\">Widgets</button><button class=\"ds-nav-item\">Sources</button></nav>",
+      "css": ".ds-nav { height: 62px; display: flex; align-items: center; gap: 28px; padding: 0 24px; border-bottom: 1px solid var(--color-border, #e5e5e5); background: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-brand { margin-right: 8px; color: var(--color-ink, #111111); font-size: 23px; font-weight: 700; letter-spacing: -1px; } .ds-brand span { color: var(--color-accent, #2563eb); } .ds-nav-item { align-self: stretch; padding: 0; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--color-muted, #666666); font-size: 13px; cursor: pointer; } .ds-nav-item:hover { color: var(--color-ink, #111111); } .ds-nav-active { border-color: var(--color-accent, #2563eb); color: var(--color-accent-strong, #1d4ed8); } .ds-nav-item:focus-visible { outline: 3px solid var(--color-accent, #2563eb); outline-offset: -3px; }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "description": "Compact connected-state label with a pale blue surface.",
+      "html": "<span class=\"ds-status\"><span class=\"ds-status-dot\"></span>Connected</span>",
+      "css": ".ds-status { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border-radius: 6px; background: var(--color-accent-soft, #eff6ff); color: var(--color-accent-strong, #1d4ed8); font: 600 9px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent, #2563eb); }"
+    },
+    {
+      "name": "Surface Card",
+      "kind": "card",
+      "refersTo": "card-default",
+      "description": "Border-first container for forms, candidates, and grouped product content.",
+      "html": "<section class=\"ds-card\"><span class=\"ds-card-icon\">↗</span><h3>Turn a webpage into a widget</h3><p>Paste a public URL and choose the information you want to keep in view.</p></section>",
+      "css": ".ds-card { width: min(360px, 100%); padding: 26px; border: 1px solid #f0f0f0; border-radius: 17px; background: #fff; color: var(--color-ink, #111111); box-shadow: 0 10px 28px #11111104; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-card-icon { width: 45px; height: 45px; display: grid; place-items: center; margin-bottom: 25px; border: 1px solid #bfdbfe; border-radius: 13px; background: var(--color-accent-soft, #eff6ff); color: var(--color-accent-strong, #1d4ed8); font-weight: 700; } .ds-card h3 { margin: 0; font-size: 19px; line-height: 1.35; } .ds-card p { margin: 12px 0 0; color: var(--color-subdued, #737373); font-size: 12px; line-height: 1.9; } .ds-card:hover { border-color: var(--color-border, #e5e5e5); } .ds-card:focus-within { outline: 3px solid var(--color-accent, #2563eb); outline-offset: 4px; }"
+    },
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "description": "Quiet square control for close, delete, and utility actions.",
+      "html": "<button class=\"ds-icon-button\" aria-label=\"Close\"><svg viewBox=\"0 0 24 24\" width=\"17\" height=\"17\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M18 6 6 18M6 6l12 12\"/></svg></button>",
+      "css": ".ds-icon-button { width: 34px; height: 34px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--color-muted, #666666); cursor: pointer; transition: background 0.15s, color 0.15s, transform 0.15s; } .ds-icon-button:hover { background: var(--color-surface, #f3f3f3); color: var(--color-ink, #111111); } .ds-icon-button:active { transform: scale(0.96); } .ds-icon-button:focus-visible { outline: 3px solid var(--color-accent, #2563eb); outline-offset: 4px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Glanceable Instrument",
+    "overview": "Widget Now feels like a precise personal utility: quiet enough to keep data in charge, but confident enough to make each next action obvious. Pure white space, near-black type, light-grey surfaces, and a single clear blue accent create a crisp working canvas for content gathered from the web.\n\nThe system is compact rather than cramped. Small labels, economical controls, and firm alignment support quick scanning, while rounded widget silhouettes and restrained depth keep the product approachable. Individual widgets may carry their own theme colors; those colors belong to the content preview and do not redefine the application identity.",
+    "keyCharacteristics": [
+      "Pure-white working canvas with near-black interface ink.",
+      "Blue reserved for active, linked, focused, and high-intent moments.",
+      "Compact controls, crisp borders, and restrained ambient shadows.",
+      "Rounded widgets are expressive; surrounding product chrome stays quieter.",
+      "Responsive layouts simplify and stack without changing the visual voice."
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "Application chrome uses Widget Blue as its only saturated brand accent; theme colors inside user widgets and source demonstrations remain content, not chrome.",
+        "section": "colors"
+      },
+      {
+        "name": "The White Stage Rule",
+        "body": "Pure Canvas is the default field. Grey surfaces identify grouping or state and never become a competing page background.",
+        "section": "colors"
+      },
+      {
+        "name": "The Data Leads Rule",
+        "body": "Large type is reserved for a page-level idea or a value worth glancing at; interface explanation stays compact.",
+        "section": "typography"
+      },
+      {
+        "name": "The Scan Path Rule",
+        "body": "Layout should expose one clear reading or working path before adding secondary actions; responsive changes preserve that order rather than merely shrinking columns.",
+        "section": "layout"
+      },
+      {
+        "name": "The Earned Elevation Rule",
+        "body": "Resting product surfaces stay flat; shadows identify a floating layer, a widget object, or a deliberate interactive lift.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Chrome Stays Compact Rule",
+        "body": "Do not import a widget's large corner radius into ordinary application controls or containers.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do use Pure Canvas, Interface Ink, and neutral borders as the default product frame.",
+      "Do reserve Widget Blue for active, focused, linked, selected, or singular high-intent actions.",
+      "Do keep controls compact and use spacing to separate groups rather than inflating every component.",
+      "Do let widget content carry theme-specific color inside a stable application frame.",
+      "Do stack responsive layouts in their original scan order and make the primary action easy to reach."
+    ],
+    "donts": [
+      "Don't treat colors sampled from a source page or example widget as application brand colors.",
+      "Don't apply strong shadows to ordinary resting cards, fields, or rows.",
+      "Don't use large widget-style radii on standard application chrome.",
+      "Don't introduce a second saturated accent for routine interface state.",
+      "Don't make supporting explanation compete with values, previews, or the primary action."
+    ]
+  }
+}
