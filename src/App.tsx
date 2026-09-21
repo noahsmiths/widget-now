@@ -559,7 +559,7 @@ function Library({
       ) : (
         <div className="library-empty">
           <h2>No widgets yet</h2>
-          <p>Add a public website to get started.</p>
+          <p>Create one now to get started.</p>
         </div>
       )}
       {pipWindow &&
