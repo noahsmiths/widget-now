@@ -37,6 +37,7 @@ export default defineSchema({
     lastSuccessAt: v.union(v.number(), v.null()),
   })
     .index("by_ownerId", ["ownerId"])
+    .index("by_ownerId_and_savedCount", ["ownerId", "savedCount"])
     .index("by_nextRefreshAt", ["nextRefreshAt"]),
   widgets: defineTable({
     ownerId: v.id("users"),

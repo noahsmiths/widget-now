@@ -35,6 +35,19 @@ export const get = query({
   },
 });
 
+export const forSource = query({
+  args: { sourceId: v.id("sources") },
+  returns: v.union(v.id("widgets"), v.null()),
+  handler: async (ctx, args) => {
+    await requireSource(ctx, args.sourceId);
+    const widget = await ctx.db
+      .query("widgets")
+      .withIndex("by_sourceId", (q) => q.eq("sourceId", args.sourceId))
+      .first();
+    return widget?._id ?? null;
+  },
+});
+
 export const save = mutation({
   args: {
     sourceId: v.id("sources"),
@@ -69,6 +82,12 @@ export const save = mutation({
       });
       return { widgetId: widget._id, revision };
     }
+    const existingWidget = await ctx.db
+      .query("widgets")
+      .withIndex("by_sourceId", (q) => q.eq("sourceId", source._id))
+      .first();
+    if (source.savedCount > 0 || existingWidget)
+      throw new ConvexError("This generation already has a widget. Open it to make edits.");
     const widgetId = await ctx.db.insert("widgets", {
       ownerId: source.ownerId,
       sourceId: source._id,
@@ -78,7 +97,8 @@ export const save = mutation({
       updatedAt: Date.now(),
     });
     await ctx.db.patch("sources", source._id, {
-      savedCount: source.savedCount + 1,
+      savedCount: 1,
+      candidates: [],
       nextRefreshAt: source.refreshing
         ? null
         : (source.nextRefreshAt ?? Date.now() + 15 * 60_000),
@@ -95,10 +115,13 @@ export const remove = mutation({
     const source = await requireSource(ctx, widget.sourceId);
     await removeWidgetWatch(ctx, widget._id);
     await ctx.db.delete("widgets", widget._id);
-    await ctx.db.patch("sources", source._id, {
-      savedCount: source.savedCount - 1,
-      nextRefreshAt: source.savedCount === 1 ? null : source.nextRefreshAt,
-    });
+    if (source.savedCount === 1) {
+      await ctx.db.delete("sources", source._id);
+    } else {
+      await ctx.db.patch("sources", source._id, {
+        savedCount: source.savedCount - 1,
+      });
+    }
     return null;
   },
 });

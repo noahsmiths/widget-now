@@ -35,7 +35,9 @@ export const list = query({
     const ownerId = await requireUser(ctx);
     return ctx.db
       .query("sources")
-      .withIndex("by_ownerId", (q) => q.eq("ownerId", ownerId))
+      .withIndex("by_ownerId_and_savedCount", (q) =>
+        q.eq("ownerId", ownerId).eq("savedCount", 0),
+      )
       .order("desc")
       .paginate(args.paginationOpts);
   },

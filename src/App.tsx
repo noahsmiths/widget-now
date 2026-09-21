@@ -149,7 +149,11 @@ export default function App() {
                     onCreated={(id) => navigate({ kind: "source", id })}
                   />
                 ) : route.kind === "source" ? (
-                  <SourceView sourceId={route.id} onBack={home} />
+                  <SourceView
+                    sourceId={route.id}
+                    onBack={home}
+                    onWidget={(id) => navigate({ kind: "widget", id })}
+                  />
                 ) : (
                   <SavedWidget widgetId={route.id} onBack={confirmedHome} />
                 )}
@@ -406,14 +410,20 @@ function CreateWidget({
 function SourceView({
   sourceId,
   onBack,
+  onWidget,
 }: {
   sourceId: Id<"sources">;
   onBack: () => void;
+  onWidget: (id: Id<"widgets">) => void;
 }) {
   const source = useQuery(api.sources.get, { sourceId });
+  const existingWidgetId = useQuery(api.widgets.forSource, { sourceId });
   const retry = useMutation(api.sources.retry);
   const [candidate, setCandidate] = useState<WidgetDefinitionV1 | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!candidate && existingWidgetId) onWidget(existingWidgetId);
+  }, [candidate, existingWidgetId, onWidget]);
   if (!source) return <Loading />;
   if (candidate)
     return (
@@ -421,11 +431,16 @@ function SourceView({
         source={source}
         initialDefinition={candidate}
         onBack={() => {
+          if (source.savedCount > 0) {
+            onBack();
+            return;
+          }
           setCandidate(null);
           window.history.replaceState(null, "", `#source=${sourceId}`);
         }}
       />
     );
+  if (existingWidgetId === undefined || existingWidgetId) return <Loading />;
   if (source.status === "failed")
     return (
       <div className="generation-state">
