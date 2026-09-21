@@ -7,6 +7,7 @@ import username from "@convex-dev/auth/username/convex.config.js";
 import firecrawl from "@firecrawl/firecrawl-convex/convex.config";
 import workflow from "@convex-dev/workflow/convex.config";
 import agent from "@convex-dev/agent/convex.config";
+import staticHosting from "@convex-dev/static-hosting/convex.config";
 
 const app = defineApp({
   env: {
@@ -38,6 +39,7 @@ app.use(firecrawl, { env: { FIRECRAWL_API_KEY: app.env.FIRECRAWL_API_KEY } });
 app.use(workflow);
 app.use(workflow, { name: "mailWorkflow" });
 app.use(agent);
+app.use(staticHosting);
 app.use(oauth, {
   name: "oauthGithub",
   httpPrefix: "/oauth/github",

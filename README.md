@@ -23,7 +23,7 @@ npx convex env set OPENAI_MODEL gpt-5-mini
 
 The first two commands accept secrets through stdin. Keep provider keys in Convex environment variables, never in browser variables or tracked files. `OPENAI_MODEL` is optional and defaults to `gpt-5-mini`. The Firecrawl component requires its key before deployment; a missing OpenAI key produces a clear generation error and can be configured before retrying.
 
-Existing password and GitHub sign-in remain supported. GitHub redirect origins are configured for the local Vite app and the Convex site handoff in `convex/auth.ts`. Public production hosting is not configured by this version.
+Existing password and GitHub sign-in remain supported. GitHub redirect origins are configured for the local Vite app and the Convex site handoff in `convex/auth.ts`. Production hosting uses the Convex static-hosting component; `npm run deploy` builds the frontend with the production deployment URL, deploys the backend, and publishes the site.
 
 ## How it works
 
