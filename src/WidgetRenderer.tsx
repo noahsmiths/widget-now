@@ -43,12 +43,18 @@ export function WidgetRenderer({
   width,
   selectedId,
   renderOverlay,
+  editableTextId,
+  onTextInput,
+  onTextBlur,
 }: {
   definition: WidgetDefinitionV1;
   fields: DataField[];
   width: number;
   selectedId?: string | null;
   renderOverlay?: (element: WidgetElement, scale: number) => ReactNode;
+  editableTextId?: string | null;
+  onTextInput?: (elementId: string, text: string, target: HTMLElement) => void;
+  onTextBlur?: (elementId: string) => void;
 }) {
   const canvas = sizes[definition.size];
   const scale = width / canvas.width;
@@ -101,7 +107,26 @@ export function WidgetRenderer({
               style={css}
             >
               {element.kind === "text" && (
-                <div className="widget-text">{element.text}</div>
+                <div
+                  className={`widget-text ${editableTextId === element.id ? "widget-text-editing" : ""}`}
+                  contentEditable={editableTextId === element.id}
+                  suppressContentEditableWarning
+                  data-widget-text-id={element.id}
+                  onInput={(event) =>
+                    onTextInput?.(
+                      element.id,
+                      event.currentTarget.innerText,
+                      event.currentTarget,
+                    )
+                  }
+                  onBlur={() => onTextBlur?.(element.id)}
+                  onKeyDown={(event) => {
+                    if (!style.wrap && event.key === "Enter")
+                      event.preventDefault();
+                  }}
+                >
+                  {element.text}
+                </div>
               )}
               {element.kind === "data" && (
                 <div className="widget-data">

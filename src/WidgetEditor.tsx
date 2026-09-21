@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useReducer,
   useRef,
   useState,
@@ -12,7 +13,6 @@ import { api } from "../convex/_generated/api";
 import type { Doc, Id } from "../convex/_generated/dataModel";
 import {
   ArrowLeft,
-  Check,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -44,16 +44,13 @@ import {
   splitLiveDataElements,
   type Design,
 } from "./editorState";
-import { errorMessage, timeLabel } from "./ui";
+import { confirmWidgetDeletion, errorMessage, timeLabel } from "./ui";
 import { permitNavigation } from "./navigation";
 import { EmailWatch } from "./EmailWatch";
 
 type ResizeDirection = "ne" | "se" | "sw" | "nw";
 type ToolbarElementKind = "text" | "icon" | "shape";
-type ToolbarElement = Extract<
-  WidgetElement,
-  { kind: ToolbarElementKind }
->;
+type ToolbarElement = Extract<WidgetElement, { kind: ToolbarElementKind }>;
 type ResizeEdges = {
   left: boolean;
   right: boolean;
@@ -68,31 +65,65 @@ type Gesture = {
   edges?: ResizeEdges;
 };
 
-const resizeDirections: ResizeDirection[] = [
-  "ne",
-  "se",
-  "sw",
-  "nw",
-];
+const resizeDirections: ResizeDirection[] = ["ne", "se", "sw", "nw"];
 
 const dataElementHeight = 0.25;
 const elementInset = 6;
 const toolbarElementKinds: ToolbarElementKind[] = ["text", "icon", "shape"];
 let textMeasurementContext: CanvasRenderingContext2D | null = null;
+let textMeasurementElement: HTMLDivElement | null = null;
+
+function measuredTextSize(
+  text: string,
+  fontSize: number,
+  fontWeight: number,
+  wrap: boolean,
+  maxWidth: number,
+) {
+  if (!textMeasurementElement) {
+    textMeasurementElement = document.createElement("div");
+    Object.assign(textMeasurementElement.style, {
+      position: "fixed",
+      left: "-10000px",
+      top: "0",
+      visibility: "hidden",
+      pointerEvents: "none",
+      boxSizing: "border-box",
+      lineHeight: "1.15",
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      padding: `${elementInset}px`,
+    });
+    document.body.append(textMeasurementElement);
+  }
+  Object.assign(textMeasurementElement.style, {
+    width: "max-content",
+    maxWidth: `${maxWidth}px`,
+    whiteSpace: wrap ? "pre-wrap" : "nowrap",
+    fontSize: `${fontSize}px`,
+    fontWeight: `${fontWeight}`,
+  });
+  textMeasurementElement.textContent = text || "\u200b";
+  const bounds = textMeasurementElement.getBoundingClientRect();
+  return { width: bounds.width, height: bounds.height };
+}
 
 function contentWidth(
   text: string,
   fontSize: number,
   canvasWidth: number,
+  fontWeight = 600,
 ) {
   if (!textMeasurementContext)
     textMeasurementContext = document.createElement("canvas").getContext("2d");
   const context = textMeasurementContext;
   if (!context) return 0.35;
-  context.font = `600 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  context.font = `${fontWeight} ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
   return Math.min(
     0.8,
-    Math.max(0.04, (context.measureText(text).width + elementInset * 2) / canvasWidth),
+    Math.max(
+      0.04,
+      (context.measureText(text).width + elementInset * 2) / canvasWidth,
+    ),
   );
 }
 
@@ -104,13 +135,15 @@ function fittedElement(
   element: WidgetElement,
   fields: DataField[],
   canvas: { width: number; height: number },
-  anchor: { horizontal: "left" | "center" | "right"; vertical: "top" | "center" | "bottom" } = {
+  anchor: {
+    horizontal: "left" | "center" | "right";
+    vertical: "top" | "center" | "bottom";
+  } = {
     horizontal: "center",
     vertical: "center",
   },
 ): WidgetElement {
-  if (element.kind === "shape" || (element.kind === "text" && element.style.wrap))
-    return element;
+  if (element.kind === "shape") return element;
   const field =
     element.kind === "data"
       ? fields.find((item) => item.id === element.fieldId)
@@ -121,14 +154,21 @@ function fittedElement(
       : element.kind === "data"
         ? formatValue(field, element.precision, element.showUnit)
         : "";
-  const width =
+  const measured =
     element.kind === "icon"
-      ? (element.style.fontSize + elementInset * 2) / canvas.width
-      : contentWidth(text, element.style.fontSize, canvas.width);
-  const height =
-    element.kind === "icon"
-      ? (element.style.fontSize + elementInset * 2) / canvas.height
-      : contentHeight(element.style.fontSize, canvas.height);
+      ? {
+          width: element.style.fontSize + elementInset * 2,
+          height: element.style.fontSize + elementInset * 2,
+        }
+      : measuredTextSize(
+          text,
+          element.style.fontSize,
+          element.style.fontWeight,
+          element.style.wrap,
+          element.style.wrap ? canvas.width * 0.8 : canvas.width,
+        );
+  const width = Math.max(0.04, measured.width / canvas.width);
+  const height = Math.max(0.04, measured.height / canvas.height);
   const x =
     anchor.horizontal === "left"
       ? element.frame.x
@@ -247,7 +287,11 @@ function ToolbarDragPreview({
     padding: element.kind === "shape" ? 0 : 6 * scale,
   } as const;
   return (
-    <span className="toolbar-native-drag-image" aria-hidden="true" style={style}>
+    <span
+      className="toolbar-native-drag-image"
+      aria-hidden="true"
+      style={style}
+    >
       {element.kind === "text" && <span>{element.text}</span>}
       {element.kind === "icon" && (
         <Sun
@@ -281,11 +325,13 @@ export function WidgetEditor({
   initialDefinition,
   widget,
   onBack,
+  onDeleted,
 }: {
   source: Doc<"sources">;
   initialDefinition: WidgetDefinitionV1;
   widget?: Doc<"widgets">;
   onBack: () => void;
+  onDeleted: () => void;
 }) {
   const normalizedDefinition = splitLiveDataElements(initialDefinition);
   const normalizedCanvas = sizes[normalizedDefinition.size];
@@ -298,7 +344,11 @@ export function WidgetEditor({
           element.kind === "data"
             ? { ...element, label: formatDataFieldTitle(element.label) }
             : element;
-        return fittedElement(normalizedElement, source.fields, normalizedCanvas);
+        return fittedElement(
+          normalizedElement,
+          source.fields,
+          normalizedCanvas,
+        );
       }),
     },
   };
@@ -315,11 +365,13 @@ export function WidgetEditor({
     widget ? { widgetId: widget._id, revision: widget.revision } : null,
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [previewElement, setPreviewElement] =
-    useState<WidgetElement | null>(null);
+  const [previewElement, setPreviewElement] = useState<WidgetElement | null>(
+    null,
+  );
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [mobilePanel, setMobilePanel] = useState<"data" | "canvas" | "style">(
     "canvas",
   );
@@ -330,15 +382,19 @@ export function WidgetEditor({
   const [viewportWidth, setViewportWidth] = useState(480);
   const canvasContainer = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
+  const lastTextClick = useRef<{ id: string; time: number } | null>(null);
+  const textCaret = useRef<{ id: string; offset: number } | null>(null);
   const fieldGrab = useRef({ x: 0.5, y: 0.5 });
   const draggedFrame = useRef({ width: 0.35, height: dataElementHeight });
   const save = useMutation(api.widgets.save);
+  const remove = useMutation(api.widgets.remove);
   const refresh = useMutation(api.sources.requestRefresh);
   const { name, definition } = state.present;
   const selected = definition.elements.find(
     (element) => element.id === selectedId,
   );
   const dirty = JSON.stringify(state.present) !== JSON.stringify(saved);
+  const busy = saving || deleting;
   const staleFields = source.fields.some((field) => field.stale);
   const canvas = sizes[definition.size];
   const previewWidth = Math.min(
@@ -346,17 +402,14 @@ export function WidgetEditor({
     definition.size === "square" ? 360 : 640,
   );
   const scale = previewWidth / canvas.width;
-  const renderedDefinition =
-    previewElement
-      ? {
-          ...definition,
-          elements: definition.elements.map((element) =>
-            element.id === previewElement.id
-              ? previewElement
-              : element,
-          ),
-        }
-      : definition;
+  const renderedDefinition = previewElement
+    ? {
+        ...definition,
+        elements: definition.elements.map((element) =>
+          element.id === previewElement.id ? previewElement : element,
+        ),
+      }
+    : definition;
 
   useEffect(() => {
     const node = canvasContainer.current;
@@ -368,6 +421,58 @@ export function WidgetEditor({
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
+    if (!editingTextId) return;
+    const frame = window.requestAnimationFrame(() => {
+      const text = Array.from(
+        canvasContainer.current?.querySelectorAll<HTMLElement>(
+          "[data-widget-text-id]",
+        ) ?? [],
+      ).find((node) => node.dataset.widgetTextId === editingTextId);
+      if (!text) return;
+      text.focus();
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [editingTextId]);
+  useLayoutEffect(() => {
+    const caret = textCaret.current;
+    if (!caret || caret.id !== editingTextId) return;
+    const text = Array.from(
+      canvasContainer.current?.querySelectorAll<HTMLElement>(
+        "[data-widget-text-id]",
+      ) ?? [],
+    ).find((node) => node.dataset.widgetTextId === caret.id);
+    if (!text) return;
+    const range = document.createRange();
+    const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT);
+    let remaining = caret.offset;
+    let node = walker.nextNode();
+    while (node) {
+      const length = node.textContent?.length ?? 0;
+      if (remaining <= length) {
+        range.setStart(node, remaining);
+        range.collapse(true);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        textCaret.current = null;
+        return;
+      }
+      remaining -= length;
+      node = walker.nextNode();
+    }
+    range.selectNodeContents(text);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    textCaret.current = null;
+  }, [definition, editingTextId]);
+  useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -377,15 +482,15 @@ export function WidgetEditor({
   }, [dirty]);
   useEffect(() => {
     const confirm = (event: Event) => {
-      if (saving || (dirty && !window.confirm("Discard your unsaved changes?")))
+      if (busy || (dirty && !window.confirm("Discard your unsaved changes?")))
         event.preventDefault();
     };
     window.addEventListener("widget-now:navigate", confirm);
     return () => window.removeEventListener("widget-now:navigate", confirm);
-  }, [dirty, saving]);
+  }, [busy, dirty]);
   useEffect(() => {
     const removeWithBackspace = (event: KeyboardEvent) => {
-      if (event.key !== "Backspace" || saving || !selectedId) return;
+      if (event.key !== "Backspace" || busy || !selectedId) return;
       const target = event.target;
       if (
         target instanceof HTMLInputElement ||
@@ -406,24 +511,33 @@ export function WidgetEditor({
           },
         },
       });
-      setNotice(null);
       setSelectedId(null);
     };
     window.addEventListener("keydown", removeWithBackspace);
     return () => window.removeEventListener("keydown", removeWithBackspace);
-  }, [definition, name, saving, selectedId]);
+  }, [busy, definition, name, selectedId]);
 
   function change(next: WidgetDefinitionV1) {
     dispatch({ type: "change", design: { name, definition: next } });
-    setNotice(null);
   }
-  function editElement(next: WidgetElement) {
+  function editElement(next: WidgetElement, fit = true) {
+    const fitted = fit ? fittedElement(next, source.fields, canvas) : next;
     change({
       ...definition,
       elements: definition.elements.map((element) =>
-        element.id === next.id ? next : element,
+        element.id === fitted.id ? fitted : element,
       ),
     });
+  }
+  function rememberTextCaret(elementId: string, target: HTMLElement) {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if (!target.contains(range.endContainer)) return;
+    const before = range.cloneRange();
+    before.selectNodeContents(target);
+    before.setEnd(range.endContainer, range.endOffset);
+    textCaret.current = { id: elementId, offset: before.toString().length };
   }
   function add(
     kind: WidgetElement["kind"],
@@ -550,7 +664,7 @@ export function WidgetEditor({
     element: WidgetElement,
     direction?: ResizeDirection,
   ) {
-    if (saving) return;
+    if (busy) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -571,6 +685,15 @@ export function WidgetEditor({
       x: event.clientX,
       y: event.clientY,
     };
+  }
+  function beginElementPointerGesture(
+    event: PointerEvent<HTMLDivElement>,
+    element: WidgetElement,
+  ) {
+    const direction = (event.target as HTMLElement).closest<HTMLElement>(
+      "[data-resize]",
+    )?.dataset.resize as ResizeDirection | undefined;
+    beginGesture(event, element, direction);
   }
   function moveFrame(event: PointerEvent<HTMLDivElement>) {
     const current = gesture.current;
@@ -642,11 +765,23 @@ export function WidgetEditor({
       });
       setTarget(result);
       setSaved(submitted);
-      setNotice("Widget saved. Live data refreshes every 15 minutes.");
       window.history.replaceState(null, "", `#widget=${result.widgetId}`);
       return result.widgetId;
     } finally {
       setSaving(false);
+    }
+  }
+  async function deleteWidget() {
+    if (!target) return;
+    if (!confirmWidgetDeletion(name)) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await remove({ widgetId: target.widgetId });
+      onDeleted();
+    } catch (err) {
+      setError(errorMessage(err));
+      setDeleting(false);
     }
   }
   function leave() {
@@ -670,7 +805,7 @@ export function WidgetEditor({
               aria-label="Widget name"
               maxLength={100}
               value={name}
-              disabled={saving}
+              disabled={busy}
               onChange={(event) =>
                 dispatch({
                   type: "change",
@@ -688,11 +823,21 @@ export function WidgetEditor({
             widgetId={target?.widgetId ?? null}
             fields={source.fields}
             onSaveWidget={saveDesign}
-            disabled={saving}
+            disabled={busy}
           />
+          {target && (
+            <button
+              className="danger-button"
+              disabled={busy}
+              onClick={() => void deleteWidget()}
+            >
+              <Trash2 size={16} />
+              {deleting ? "Deleting…" : "Delete"}
+            </button>
+          )}
           <button
             className="primary"
-            disabled={saving || (target !== null && !dirty)}
+            disabled={busy || (target !== null && !dirty)}
             onClick={() =>
               void saveDesign().catch((err: unknown) =>
                 setError(errorMessage(err)),
@@ -710,12 +855,6 @@ export function WidgetEditor({
           <button className="text-button" onClick={() => setError(null)}>
             Dismiss
           </button>
-        </div>
-      )}
-      {notice && (
-        <div className="notice" role="status">
-          <Check size={16} />
-          {notice}
         </div>
       )}
       <div
@@ -739,10 +878,10 @@ export function WidgetEditor({
           </button>
         ))}
       </div>
-      <fieldset className="editor-fieldset" disabled={saving}>
+      <fieldset className="editor-fieldset" disabled={busy}>
         <div
-          className={`editor-grid mobile-panel-${mobilePanel} ${saving ? "editor-saving" : ""}`}
-          aria-busy={saving}
+          className={`editor-grid mobile-panel-${mobilePanel} ${busy ? "editor-saving" : ""}`}
+          aria-busy={busy}
         >
           <aside className="data-panel">
             <div className="data-panel-header">
@@ -760,7 +899,7 @@ export function WidgetEditor({
                 className="secondary data-refresh"
                 aria-label="Refresh extracted data"
                 title="Refresh extracted data"
-                disabled={saving || !target || source.refreshing}
+                disabled={busy || !target || source.refreshing}
                 onClick={() => {
                   void refresh({ sourceId: source._id }).catch((err: unknown) =>
                     setError(errorMessage(err)),
@@ -798,17 +937,11 @@ export function WidgetEditor({
                       fieldGrab.current = {
                         x: Math.max(
                           0,
-                          Math.min(
-                            1,
-                            (event.clientX - rect.left) / rect.width,
-                          ),
+                          Math.min(1, (event.clientX - rect.left) / rect.width),
                         ),
                         y: Math.max(
                           0,
-                          Math.min(
-                            1,
-                            (event.clientY - rect.top) / rect.height,
-                          ),
+                          Math.min(1, (event.clientY - rect.top) / rect.height),
                         ),
                       };
                       event.dataTransfer.setData(
@@ -840,10 +973,8 @@ export function WidgetEditor({
                       className="field-native-drag-image"
                       aria-hidden="true"
                       style={{
-                        width:
-                          previewWidth * layout.frame.width,
-                        height:
-                          canvas.height * scale * layout.frame.height,
+                        width: previewWidth * layout.frame.width,
+                        height: canvas.height * scale * layout.frame.height,
                         color: newElementColor(definition),
                         background: "transparent",
                         fontSize: 28 * scale,
@@ -910,7 +1041,7 @@ export function WidgetEditor({
                 <button
                   className="icon-button"
                   aria-label="Undo"
-                  disabled={!state.past.length || saving}
+                  disabled={!state.past.length || busy}
                   onClick={() => dispatch({ type: "undo" })}
                 >
                   <Undo2 size={16} />
@@ -918,7 +1049,7 @@ export function WidgetEditor({
                 <button
                   className="icon-button"
                   aria-label="Redo"
-                  disabled={!state.future.length || saving}
+                  disabled={!state.future.length || busy}
                   onClick={() => dispatch({ type: "redo" })}
                 >
                   <Redo2 size={16} />
@@ -928,7 +1059,10 @@ export function WidgetEditor({
             <div
               className="canvas-stage"
               ref={canvasContainer}
-              onClick={() => setSelectedId(null)}
+              onClick={() => {
+                setSelectedId(null);
+                setEditingTextId(null);
+              }}
             >
               <div
                 className={`canvas-drop-zone ${draggingFieldId || draggingElementKind ? "can-drop" : ""} ${dropOverWidget ? "drop-over" : ""}`}
@@ -963,11 +1097,7 @@ export function WidgetEditor({
                     "application/widget-field",
                   );
                   if (source.fields.some((field) => field.id === id))
-                    add(
-                      "data",
-                      id,
-                      dragPosition(event, event.currentTarget),
-                    );
+                    add("data", id, dragPosition(event, event.currentTarget));
                   const kind = event.dataTransfer.getData(
                     "application/widget-element",
                   );
@@ -985,6 +1115,18 @@ export function WidgetEditor({
                   fields={source.fields}
                   width={previewWidth}
                   selectedId={selectedId}
+                  editableTextId={editingTextId}
+                  onTextInput={(elementId, text, target) => {
+                    rememberTextCaret(elementId, target);
+                    const element = definition.elements.find(
+                      (item) => item.id === elementId,
+                    );
+                    if (element?.kind === "text")
+                      editElement({ ...element, text });
+                  }}
+                  onTextBlur={(elementId) => {
+                    if (editingTextId === elementId) setEditingTextId(null);
+                  }}
                   renderOverlay={(element) => {
                     const frame =
                       selectedId === element.id && previewElement
@@ -993,7 +1135,7 @@ export function WidgetEditor({
                     return (
                       <div
                         key={element.id}
-                        className={`element-handle ${selectedId === element.id ? "handle-selected" : ""}`}
+                        className={`element-handle ${selectedId === element.id ? "handle-selected" : ""} ${editingTextId === element.id ? "text-editing" : ""}`}
                         style={{
                           left: `${frame.x * 100}%`,
                           top: `${frame.y * 100}%`,
@@ -1002,16 +1144,36 @@ export function WidgetEditor({
                         }}
                         onClick={(event) => {
                           event.stopPropagation();
+                          if (
+                            (event.target as HTMLElement).closest(
+                              "[data-resize]",
+                            )
+                          )
+                            return;
+                          const previous = lastTextClick.current;
+                          const now = Date.now();
+                          lastTextClick.current = {
+                            id: element.id,
+                            time: now,
+                          };
                           setSelectedId(element.id);
+                          setEditingTextId(
+                            element.kind === "text" &&
+                              previous?.id === element.id &&
+                              now - previous.time < 500
+                              ? element.id
+                              : null,
+                          );
+                        }}
+                        onDoubleClick={(event) => {
+                          if (element.kind !== "text") return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setSelectedId(element.id);
+                          setEditingTextId(element.id);
                         }}
                         onPointerDown={(event) =>
-                          beginGesture(
-                            event,
-                            element,
-                            (event.target as HTMLElement).closest<HTMLElement>(
-                              "[data-resize]",
-                            )?.dataset.resize as ResizeDirection | undefined,
-                          )
+                          beginElementPointerGesture(event, element)
                         }
                         onPointerMove={(event) => {
                           const frame = moveFrame(event);
@@ -1108,55 +1270,6 @@ export function WidgetEditor({
                     }
                   />
                 </Property>
-                <div className="theme-presets">
-                  {[
-                    {
-                      name: "White",
-                      background: "#ffffff",
-                      foreground: "#111111",
-                      theme: "light",
-                    },
-                    {
-                      name: "Light grey",
-                      background: "#f3f3f3",
-                      foreground: "#111111",
-                      theme: "light",
-                    },
-                    {
-                      name: "Black",
-                      background: "#111111",
-                      foreground: "#ffffff",
-                      theme: "dark",
-                    },
-                    {
-                      name: "Blue",
-                      background: "#2563eb",
-                      foreground: "#ffffff",
-                      theme: "dark",
-                    },
-                  ].map((theme) => (
-                    <button
-                      key={theme.name}
-                      aria-label={`${theme.name} theme`}
-                      title={theme.name}
-                      style={{ background: theme.background }}
-                      onClick={() =>
-                        change({
-                          ...definition,
-                          background: theme.background,
-                          theme: theme.theme as WidgetDefinitionV1["theme"],
-                          elements: definition.elements.map((element) => ({
-                            ...element,
-                            style: {
-                              ...element.style,
-                              color: theme.foreground,
-                            },
-                          })),
-                        })
-                      }
-                    />
-                  ))}
-                </div>
               </>
             )}
             {selected && (
@@ -1449,13 +1562,16 @@ export function WidgetEditor({
                         step={1}
                         value={Math.round(selected.frame[key] * 100)}
                         onChange={(event) =>
-                          editElement({
-                            ...selected,
-                            frame: clampFrame({
-                              ...selected.frame,
-                              [key]: Number(event.target.value) / 100,
-                            }),
-                          })
+                          editElement(
+                            {
+                              ...selected,
+                              frame: clampFrame({
+                                ...selected.frame,
+                                [key]: Number(event.target.value) / 100,
+                              }),
+                            },
+                            false,
+                          )
                         }
                       />
                     </Property>

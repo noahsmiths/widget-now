@@ -28,6 +28,22 @@ import type { MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { removeWidgetWatch } from "./watches";
 
+export async function purgeSource(
+  ctx: MutationCtx,
+  source: Doc<"sources">,
+) {
+  if (source.workflowId)
+    await workflow.cancel(ctx, source.workflowId as WorkflowId);
+  const widgets = ctx.db
+    .query("widgets")
+    .withIndex("by_sourceId", (q) => q.eq("sourceId", source._id));
+  for await (const widget of widgets) {
+    await removeWidgetWatch(ctx, widget._id);
+    await ctx.db.delete("widgets", widget._id);
+  }
+  await ctx.db.delete("sources", source._id);
+}
+
 export const list = query({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(schema.doc("sources")),
@@ -121,16 +137,7 @@ export const remove = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const source = await requireSource(ctx, args.sourceId);
-    if (source.workflowId)
-      await workflow.cancel(ctx, source.workflowId as WorkflowId);
-    const widgets = ctx.db
-      .query("widgets")
-      .withIndex("by_sourceId", (q) => q.eq("sourceId", source._id));
-    for await (const widget of widgets) {
-      await removeWidgetWatch(ctx, widget._id);
-      await ctx.db.delete("widgets", widget._id);
-    }
-    await ctx.db.delete("sources", source._id);
+    await purgeSource(ctx, source);
     return null;
   },
 });
@@ -196,7 +203,7 @@ async function beginRefresh(ctx: MutationCtx, source: Doc<"sources">) {
     refreshError: null,
     nextRefreshAt: null,
   });
-  await workflow.start(
+  const workflowId = await workflow.start(
     ctx,
     internal.workflows.refresh,
     { sourceId: source._id, run },
@@ -205,6 +212,7 @@ async function beginRefresh(ctx: MutationCtx, source: Doc<"sources">) {
       context: { sourceId: source._id, run, refresh: true },
     },
   );
+  await ctx.db.patch("sources", source._id, { workflowId });
   return true;
 }
 
@@ -271,10 +279,13 @@ export const completed = internalMutation({
   returns: v.null(),
   handler: async (ctx, { workflowId, result, context }) => {
     const source = await ctx.db.get("sources", context.sourceId);
-    if (
-      !source ||
-      (context.refresh ? source.refreshRun : source.run) !== context.run
-    )
+    if (!source) {
+      await ctx.scheduler.runAfter(1000, internal.sources.cleanupWorkflow, {
+        workflowId,
+      });
+      return null;
+    }
+    if ((context.refresh ? source.refreshRun : source.run) !== context.run)
       return null;
     const failure =
       result.kind === "failed"
@@ -295,6 +306,7 @@ export const completed = internalMutation({
       await ctx.db.patch("sources", source._id, {
         refreshing: false,
         refreshError: error,
+        workflowId: null,
         nextRefreshAt: source.savedCount ? Date.now() + 15 * 60_000 : null,
         ...(error
           ? {

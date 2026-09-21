@@ -8,6 +8,11 @@ export function errorMessage(error: unknown) {
       .split("\n    at ")[0];
   return "Something went wrong. Please try again.";
 }
+export function confirmWidgetDeletion(name: string) {
+  return window.confirm(
+    `Delete “${name}”? This permanently deletes the widget and its generation.`,
+  );
+}
 export function timeLabel(timestamp: number | null) {
   return timestamp === null
     ? "Not yet"

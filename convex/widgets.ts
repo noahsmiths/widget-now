@@ -7,7 +7,7 @@ import { mutation, query } from "./_generated/server";
 import schema from "./schema";
 import { requireSource, requireUser, requireWidget } from "./access";
 import { definitionValidator, validateDefinition } from "../shared/widget";
-import { removeWidgetWatch } from "./watches";
+import { purgeSource } from "./sources";
 
 export const list = query({
   args: { paginationOpts: paginationOptsValidator },
@@ -87,7 +87,9 @@ export const save = mutation({
       .withIndex("by_sourceId", (q) => q.eq("sourceId", source._id))
       .first();
     if (source.savedCount > 0 || existingWidget)
-      throw new ConvexError("This generation already has a widget. Open it to make edits.");
+      throw new ConvexError(
+        "This generation already has a widget. Open it to make edits.",
+      );
     const widgetId = await ctx.db.insert("widgets", {
       ownerId: source.ownerId,
       sourceId: source._id,
@@ -113,15 +115,7 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const widget = await requireWidget(ctx, args.widgetId);
     const source = await requireSource(ctx, widget.sourceId);
-    await removeWidgetWatch(ctx, widget._id);
-    await ctx.db.delete("widgets", widget._id);
-    if (source.savedCount === 1) {
-      await ctx.db.delete("sources", source._id);
-    } else {
-      await ctx.db.patch("sources", source._id, {
-        savedCount: source.savedCount - 1,
-      });
-    }
+    await purgeSource(ctx, source);
     return null;
   },
 });

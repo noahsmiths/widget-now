@@ -17,11 +17,15 @@ export function EmailWatch({
   fields,
   onSaveWidget,
   disabled,
+  iconOnly = false,
+  triggerLabel = "Email notifications",
 }: {
   widgetId: Id<"widgets"> | null;
   fields: DataField[];
   onSaveWidget: () => Promise<Id<"widgets">>;
   disabled: boolean;
+  iconOnly?: boolean;
+  triggerLabel?: string;
 }) {
   const data = useQuery(api.watches.get, widgetId ? { widgetId } : "skip");
   const [open, setOpen] = useState(false);
@@ -97,16 +101,18 @@ export function EmailWatch({
     <div className="email-watch">
       <button
         type="button"
-        className="watch-trigger"
+        className={iconOnly ? "library-card-action" : "watch-trigger"}
         aria-haspopup="dialog"
+        aria-label={iconOnly ? triggerLabel : undefined}
+        title={iconOnly ? "Email notifications" : undefined}
         disabled={disabled}
         onClick={() => {
           setError(null);
           setOpen(true);
         }}
       >
-        <Mail size={14} />
-        <span>Notifications</span>
+        <Mail size={iconOnly ? 16 : 14} />
+        {!iconOnly && <span>Notifications</span>}
       </button>
       {createPortal(
         <dialog

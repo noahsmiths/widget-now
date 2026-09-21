@@ -1,4 +1,5 @@
-import { Component, useEffect, useState, type ReactNode } from "react";
+import { Component, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   Authenticated,
   Unauthenticated,
@@ -11,11 +12,13 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import {
   ArrowLeft,
   ArrowRight,
+  Bell,
   Check,
   Globe,
   Grid2X2,
   LoaderCircle,
   LogOut,
+  PictureInPicture2,
   Plus,
   RefreshCw,
   Trash2,
@@ -25,8 +28,9 @@ import type { Doc, Id } from "../convex/_generated/dataModel";
 import { sizes, type WidgetDefinitionV1 } from "../shared/widget";
 import { WidgetRenderer } from "./WidgetRenderer";
 import { WidgetEditor } from "./WidgetEditor";
+import { EmailWatch } from "./EmailWatch";
 import { SignInForm } from "./SignInForm";
-import { errorMessage, timeLabel } from "./ui";
+import { confirmWidgetDeletion, errorMessage } from "./ui";
 import { permitNavigation } from "./navigation";
 
 type Route =
@@ -34,6 +38,27 @@ type Route =
   | { kind: "create" }
   | { kind: "source"; id: Id<"sources"> }
   | { kind: "widget"; id: Id<"widgets"> };
+type PictureInPictureSelection = "all" | Id<"widgets">;
+
+function galleryWidgetWidth(size: WidgetDefinitionV1["size"]) {
+  return size === "rectangle" ? 384 : 192;
+}
+
+function preparePictureInPictureDocument(target: Document) {
+  target.title = "Widget Now";
+  target.body.className = "pip-body";
+  document.head
+    .querySelectorAll<HTMLLinkElement | HTMLStyleElement>(
+      'link[rel="stylesheet"], style',
+    )
+    .forEach((node) => {
+      const copy = node.cloneNode(true) as HTMLLinkElement | HTMLStyleElement;
+      if (copy instanceof HTMLLinkElement)
+        copy.href = (node as HTMLLinkElement).href;
+      target.head.appendChild(copy);
+    });
+}
+
 function readRoute(): Route {
   const params = new URLSearchParams(window.location.hash.slice(1));
   const widget = params.get("widget");
@@ -86,9 +111,6 @@ export default function App() {
                 onClick={home}
               >
                 Widgets
-              </button>
-              <button onClick={() => navigate({ kind: "create" })}>
-                Create
               </button>
             </>
           )}
@@ -151,6 +173,7 @@ export default function App() {
                   <SourceView
                     sourceId={route.id}
                     onBack={home}
+                    onDeleted={confirmedHome}
                     onWidget={(id) => navigate({ kind: "widget", id })}
                   />
                 ) : (
@@ -179,28 +202,250 @@ function Library({
     {},
     { initialNumItems: 12 },
   );
-  const sources = usePaginatedQuery(
+  const generations = usePaginatedQuery(
     api.sources.list,
     {},
-    { initialNumItems: 8 },
+    { initialNumItems: 24 },
   );
   const remove = useMutation(api.widgets.remove);
-  const removeGeneration = useMutation(api.sources.remove);
-  const [error, setError] = useState<string | null>(null);
+  const [widgetOrder, setWidgetOrder] = useState<Id<"widgets">[]>(() => {
+    try {
+      const stored = JSON.parse(
+        window.localStorage.getItem("widget-gallery-order") ?? "[]",
+      );
+      return Array.isArray(stored)
+        ? stored.filter((id): id is Id<"widgets"> => typeof id === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  });
+  const [draggingWidgetId, setDraggingWidgetId] =
+    useState<Id<"widgets"> | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<Id<"widgets"> | null>(null);
+  const [generationsOpen, setGenerationsOpen] = useState(false);
+  const [pipWindow, setPipWindow] = useState<Window | null>(null);
+  const [pipSelection, setPipSelection] =
+    useState<PictureInPictureSelection | null>(null);
+  const [deletingWidgetId, setDeletingWidgetId] =
+    useState<Id<"widgets"> | null>(null);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+  const draggedFromGallery = useRef(false);
+  const pipWindowRef = useRef<Window | null>(null);
+  const generationMenuRef = useRef<HTMLDivElement>(null);
+  const widgetIds = widgets.results.map((widget) => widget._id);
+  const pictureInPictureSupported = "documentPictureInPicture" in window;
+
+  useEffect(() => {
+    window.localStorage.setItem("widget-gallery-order", JSON.stringify(widgetOrder));
+  }, [widgetOrder]);
+
+  useEffect(() => {
+    if (!generationsOpen) return;
+    const close = (event: PointerEvent) => {
+      if (!generationMenuRef.current?.contains(event.target as Node))
+        setGenerationsOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setGenerationsOpen(false);
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [generationsOpen]);
+
+  useEffect(
+    () => () => {
+      pipWindowRef.current?.close();
+    },
+    [],
+  );
+
+  const visibleWidgetOrder = [
+    ...widgetOrder,
+    ...widgetIds.filter((id) => !widgetOrder.includes(id)),
+  ];
+  const orderIndex = new Map(
+    visibleWidgetOrder.map((id, index) => [id, index]),
+  );
+  const orderedWidgets = [...widgets.results].sort(
+    (left, right) =>
+      (orderIndex.get(left._id) ?? Number.MAX_SAFE_INTEGER) -
+      (orderIndex.get(right._id) ?? Number.MAX_SAFE_INTEGER),
+  );
+  const pipWidgets =
+    pipSelection === "all"
+      ? orderedWidgets
+      : orderedWidgets.filter((widget) => widget._id === pipSelection);
+
+  useEffect(() => {
+    if (
+      pipWindow &&
+      pipSelection === "all" &&
+      widgets.status === "CanLoadMore"
+    )
+      widgets.loadMore(12);
+  }, [pipSelection, pipWindow, widgets]);
+
+  async function openPictureInPicture(
+    selection: PictureInPictureSelection,
+  ) {
+    const api = window.documentPictureInPicture;
+    if (!api) return;
+    const widget =
+      selection === "all"
+        ? null
+        : orderedWidgets.find((item) => item._id === selection);
+    if (selection !== "all" && !widget) return;
+    setLibraryError(null);
+    try {
+      const contentWidth = widget
+        ? galleryWidgetWidth(widget.definition.size)
+        : Math.max(
+            192,
+            ...orderedWidgets.map((item) =>
+              galleryWidgetWidth(item.definition.size),
+            ),
+          );
+      const contentHeight = widget
+        ? 192
+        : Math.max(
+            192,
+            orderedWidgets.length * 192 +
+              Math.max(0, orderedWidgets.length - 1) * 12,
+          );
+      const nextWindow = await api.requestWindow({
+        width: contentWidth + 24,
+        height: Math.min(contentHeight + 24, 560),
+        disallowReturnToOpener: true,
+      });
+      preparePictureInPictureDocument(nextWindow.document);
+      pipWindowRef.current = nextWindow;
+      setPipSelection(selection);
+      setPipWindow(nextWindow);
+      nextWindow.addEventListener(
+        "pagehide",
+        () => {
+          if (pipWindowRef.current === nextWindow)
+            pipWindowRef.current = null;
+          setPipWindow((current) => (current === nextWindow ? null : current));
+          setPipSelection((current) =>
+            window.documentPictureInPicture?.window ? current : null,
+          );
+        },
+        { once: true },
+      );
+    } catch (error) {
+      setLibraryError(errorMessage(error));
+    }
+  }
+
+  async function deleteWidget(widget: Doc<"widgets">) {
+    if (!confirmWidgetDeletion(widget.name)) return;
+    setDeletingWidgetId(widget._id);
+    setLibraryError(null);
+    try {
+      await remove({ widgetId: widget._id });
+      setWidgetOrder((current) =>
+        current.filter((id) => id !== widget._id),
+      );
+      if (pipSelection === widget._id) pipWindowRef.current?.close();
+    } catch (error) {
+      setLibraryError(errorMessage(error));
+    } finally {
+      setDeletingWidgetId(null);
+    }
+  }
+
+  function reorderWidgets(
+    draggedId: Id<"widgets">,
+    targetId: Id<"widgets">,
+  ) {
+    if (draggedId === targetId) return;
+    setWidgetOrder((current) => {
+      const all = [
+        ...current.filter((id) => widgetIds.includes(id)),
+        ...widgetIds.filter((id) => !current.includes(id)),
+      ];
+      const targetIndex = all.indexOf(targetId);
+      if (targetIndex < 0 || !all.includes(draggedId)) return current;
+      const withoutDragged = all.filter((id) => id !== draggedId);
+      return [
+        ...withoutDragged.slice(0, targetIndex),
+        draggedId,
+        ...withoutDragged.slice(targetIndex),
+      ];
+    });
+  }
+
+  const generationInProgress = generations.results.some(
+    (generation) =>
+      generation.status === "scraping" ||
+      generation.status === "extracting" ||
+      generation.status === "designing",
+  );
+
   return (
     <>
       <div className="page-heading">
-        <div>
+        <div className="library-heading-title">
           <h1>My widgets</h1>
+          <button
+            className="icon-button library-popout-all"
+            aria-label="Pop out all widgets"
+            title={
+              pictureInPictureSupported
+                ? "Pop out all widgets"
+                : "Picture-in-picture is not supported in this browser"
+            }
+            disabled={!pictureInPictureSupported || !orderedWidgets.length}
+            onClick={() => void openPictureInPicture("all")}
+          >
+            <PictureInPicture2 size={17} />
+          </button>
         </div>
-        <button className="primary" onClick={onCreate}>
-          <Plus size={17} />
-          Create a widget
-        </button>
+        <div className="library-actions">
+          {generations.results.length > 0 && (
+            <div className="generation-menu-wrap" ref={generationMenuRef}>
+              <button
+                className="icon-button generation-trigger"
+                aria-label="View widget generations"
+                aria-haspopup="dialog"
+                aria-expanded={generationsOpen}
+                onClick={() => setGenerationsOpen((open) => !open)}
+              >
+                {generationInProgress ? (
+                  <LoaderCircle size={18} className="spin" />
+                ) : (
+                  <Bell size={18} />
+                )}
+              </button>
+              {generationsOpen && (
+                <GenerationMenu
+                  generations={generations}
+                  onSource={(id) => {
+                    setGenerationsOpen(false);
+                    onSource(id);
+                  }}
+                />
+              )}
+            </div>
+          )}
+          <button className="primary" onClick={onCreate}>
+            <Plus size={17} />
+            Create a widget
+          </button>
+        </div>
       </div>
-      {error && (
+      {libraryError && (
         <div className="alert" role="alert">
-          {error}
+          {libraryError}
+          <button className="text-button" onClick={() => setLibraryError(null)}>
+            Dismiss
+          </button>
         </div>
       )}
       {widgets.status === "LoadingFirstPage" ? (
@@ -208,33 +453,100 @@ function Library({
       ) : widgets.results.length ? (
         <>
           <div className="library-grid">
-            {widgets.results.map((widget) => (
-              <div className="library-card" key={widget._id}>
+            {orderedWidgets.map((widget) => (
+              <div
+                className={`library-card ${widget.definition.size} ${draggingWidgetId === widget._id ? "is-dragging" : ""} ${dropTargetId === widget._id ? "is-drop-target" : ""}`}
+                key={widget._id}
+                draggable
+                onDragStart={(event) => {
+                  if (
+                    (event.target as HTMLElement).closest(
+                      ".library-card-actions",
+                    )
+                  ) {
+                    event.preventDefault();
+                    return;
+                  }
+                  draggedFromGallery.current = true;
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", widget._id);
+                  setDraggingWidgetId(widget._id);
+                }}
+                onDragOver={(event) => {
+                  if (draggingWidgetId && draggingWidgetId !== widget._id) {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setDropTargetId(widget._id);
+                  }
+                }}
+                onDragLeave={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node))
+                    setDropTargetId((current) =>
+                      current === widget._id ? null : current,
+                    );
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (draggingWidgetId) reorderWidgets(draggingWidgetId, widget._id);
+                  setDropTargetId(null);
+                }}
+                onDragEnd={() => {
+                  setDraggingWidgetId(null);
+                  setDropTargetId(null);
+                  window.setTimeout(() => {
+                    draggedFromGallery.current = false;
+                  });
+                }}
+              >
                 <button
-                  className="library-card-main"
-                  onClick={() => onWidget(widget._id)}
-                >
-                  <LibraryPreview widget={widget} />
-                  <div className="library-card-caption">
-                    <h3>{widget.name}</h3>
-                    <span>
-                      {sizes[widget.definition.size].label} ·{" "}
-                      {timeLabel(widget.updatedAt)}
-                    </span>
-                  </div>
-                </button>
-                <button
-                  className="icon-button delete-widget"
-                  aria-label={`Delete ${widget.name}`}
+                  className="library-card-open"
+                  aria-label={`Open ${widget.name}`}
                   onClick={() => {
-                    if (window.confirm(`Delete “${widget.name}”?`))
-                      void remove({ widgetId: widget._id }).catch(
-                        (err: unknown) => setError(errorMessage(err)),
-                      );
+                    if (!draggedFromGallery.current) onWidget(widget._id);
                   }}
                 >
-                  <Trash2 size={15} />
+                  <LibraryPreview widget={widget} />
                 </button>
+                <div
+                  className="library-card-actions"
+                  onPointerDown={(event) => event.stopPropagation()}
+                >
+                  <button
+                    className="library-card-action"
+                    aria-label={`Pop out ${widget.name}`}
+                    title={
+                      pictureInPictureSupported
+                        ? "Pop out widget"
+                        : "Picture-in-picture is not supported in this browser"
+                    }
+                    disabled={!pictureInPictureSupported}
+                    draggable={false}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void openPictureInPicture(widget._id);
+                    }}
+                  >
+                    <PictureInPicture2 size={16} />
+                  </button>
+                  <LibraryEmailWatch
+                    widget={widget}
+                    disabled={deletingWidgetId !== null}
+                  />
+                  <button
+                    className="library-card-action library-card-delete"
+                    aria-label={`Delete ${widget.name}`}
+                    title="Delete widget"
+                    disabled={deletingWidgetId !== null}
+                    draggable={false}
+                    onClick={() => void deleteWidget(widget)}
+                  >
+                    {deletingWidgetId === widget._id ? (
+                      <LoaderCircle size={16} className="spin" />
+                    ) : (
+                      <Trash2 size={16} />
+                    )}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -253,59 +565,97 @@ function Library({
           <p>Add a public website to get started.</p>
         </div>
       )}
-      {sources.results.length > 0 && (
-        <section className="recent-sources">
-          <div className="section-heading">
-            <h2>Recent generations</h2>
-          </div>
-          {sources.results.map((source) => (
-            <div className="source-row" key={source._id}>
-              <button
-                className="source-row-main"
-                onClick={() => onSource(source._id)}
-              >
-                <span className="source-row-icon">
-                  <Globe size={18} />
-                </span>
-                <div>
-                  <strong>{source.title}</strong>
-                  <p>{source.url}</p>
-                </div>
-                <span
-                  className={`status-pill ${source.status === "failed" ? "status-error" : ""}`}
-                >
-                  {source.status === "ready"
-                    ? "Ready to customize"
-                    : source.status === "failed"
-                      ? "Needs a retry"
-                      : source.status}
-                </span>
-                <ArrowRight size={16} />
-              </button>
-              <button
-                className="icon-button delete-generation"
-                aria-label={`Delete generation ${source.title}`}
-                onClick={() => {
-                  if (window.confirm(`Delete generation “${source.title}”?`))
-                    void removeGeneration({ sourceId: source._id }).catch(
-                      (err: unknown) => setError(errorMessage(err)),
-                    );
-                }}
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
-          ))}
-          {sources.status === "CanLoadMore" && (
-            <button className="text-button" onClick={() => sources.loadMore(8)}>
-              More generations
-            </button>
-          )}
-        </section>
-      )}
+      {pipWindow &&
+        pipSelection &&
+        createPortal(
+          <div
+            className={`pip-widgets ${pipSelection === "all" ? "all" : "single"}`}
+          >
+            {pipWidgets.map((widget) => (
+              <PictureInPictureWidget key={widget._id} widget={widget} />
+            ))}
+          </div>,
+          pipWindow.document.body,
+        )}
     </>
   );
 }
+
+function GenerationMenu({
+  generations,
+  onSource,
+}: {
+  generations: ReturnType<typeof usePaginatedQuery<typeof api.sources.list>>;
+  onSource: (id: Id<"sources">) => void;
+}) {
+  return (
+    <div
+      className="generation-menu"
+      role="dialog"
+      aria-label="Widget generations"
+    >
+      <div className="generation-menu-heading">
+        <strong>Created widgets</strong>
+      </div>
+      {generations.results.length ? (
+        <div className="generation-menu-list">
+          {generations.results.map((generation) => (
+            <button
+              className="generation-menu-item"
+              key={generation._id}
+              onClick={() => onSource(generation._id)}
+            >
+              <span
+                className={`generation-status-mark ${generation.status === "failed" ? "failed" : generation.status === "ready" ? "ready" : "working"}`}
+              >
+                {generation.status === "scraping" ||
+                generation.status === "extracting" ||
+                generation.status === "designing" ? (
+                  <LoaderCircle size={14} className="spin" />
+                ) : generation.status === "ready" ? (
+                  <Check size={14} />
+                ) : (
+                  <span />
+                )}
+              </span>
+              <span className="generation-menu-copy">
+                <strong>{generation.title}</strong>
+                <span>{generationStatus(generation.status)}</span>
+              </span>
+              <ArrowRight size={15} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="generation-menu-empty">No generations yet.</p>
+      )}
+      {generations.status === "CanLoadMore" && (
+        <button
+          className="text-button generation-menu-more"
+          onClick={() => generations.loadMore(24)}
+        >
+          Load more
+        </button>
+      )}
+    </div>
+  );
+}
+
+function generationStatus(status: Doc<"sources">["status"]) {
+  switch (status) {
+    case "scraping":
+      return "Reading website";
+    case "extracting":
+      return "Extracting data";
+    case "designing":
+      return "Designing widget";
+    case "ready":
+      return "Ready to customize";
+    case "failed":
+      return "Needs a retry";
+  }
+}
+
 function LibraryPreview({ widget }: { widget: Doc<"widgets"> }) {
   const source = useQuery(api.sources.get, { sourceId: widget.sourceId });
   return (
@@ -313,18 +663,78 @@ function LibraryPreview({ widget }: { widget: Doc<"widgets"> }) {
       <WidgetRenderer
         definition={widget.definition}
         fields={source?.fields ?? []}
-        width={widget.definition.size === "rectangle" ? 264 : 192}
+        width={galleryWidgetWidth(widget.definition.size)}
       />
-      <span
-        className={`preview-status ${source?.fields.some((field) => field.stale) ? "stale" : ""}`}
-      >
-        <span className="live-dot" />
-        {source?.refreshing
-          ? "Refreshing"
-          : source?.fields.some((field) => field.stale)
-            ? "Stale data"
-            : "Live"}
-      </span>
+    </div>
+  );
+}
+
+function LibraryEmailWatch({
+  widget,
+  disabled,
+}: {
+  widget: Doc<"widgets">;
+  disabled: boolean;
+}) {
+  const source = useQuery(api.sources.get, { sourceId: widget.sourceId });
+  return (
+    <EmailWatch
+      widgetId={widget._id}
+      fields={source?.fields ?? []}
+      onSaveWidget={() => Promise.resolve(widget._id)}
+      disabled={disabled || !source}
+      iconOnly
+      triggerLabel={`Email notifications for ${widget.name}`}
+    />
+  );
+}
+
+function PictureInPictureWidget({ widget }: { widget: Doc<"widgets"> }) {
+  const source = useQuery(api.sources.get, { sourceId: widget.sourceId });
+  const container = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const node = container.current;
+    if (!node) return;
+    const pip = node.ownerDocument.defaultView!;
+    const layout = node.parentElement!;
+    const aspectRatio = widget.definition.size === "rectangle" ? 2 : 1;
+    const updateWidth = () => {
+      const naturalWidth = Number.parseFloat(
+        pip
+          .getComputedStyle(node)
+          .getPropertyValue("--pip-widget-width"),
+      );
+      setWidth(
+        Math.min(
+          naturalWidth,
+          layout.clientWidth,
+          Math.max(1, pip.innerHeight - 24) * aspectRatio,
+        ),
+      );
+    };
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(layout);
+    pip.addEventListener("resize", updateWidth);
+    updateWidth();
+    return () => {
+      observer.disconnect();
+      pip.removeEventListener("resize", updateWidth);
+    };
+  }, [widget.definition.size]);
+  return (
+    <div
+      ref={container}
+      className={`pip-widget ${widget.definition.size}`}
+      style={width > 0 ? { width, flexBasis: width } : undefined}
+    >
+      {width > 0 && (
+        <WidgetRenderer
+          definition={widget.definition}
+          fields={source?.fields ?? []}
+          width={width}
+        />
+      )}
     </div>
   );
 }
@@ -405,10 +815,12 @@ function CreateWidget({
 function SourceView({
   sourceId,
   onBack,
+  onDeleted,
   onWidget,
 }: {
   sourceId: Id<"sources">;
   onBack: () => void;
+  onDeleted: () => void;
   onWidget: (id: Id<"widgets">) => void;
 }) {
   const source = useQuery(api.sources.get, { sourceId });
@@ -425,6 +837,7 @@ function SourceView({
       <WidgetEditor
         source={source}
         initialDefinition={candidate}
+        onDeleted={onDeleted}
         onBack={() => {
           if (source.savedCount > 0) {
             onBack();
@@ -515,10 +928,7 @@ function SourceView({
           <h1>Choose a design</h1>
           <p>{source.fields.length} fields found · Customize after choosing</p>
         </div>
-        <span className="connected-pill">
-          <span className="live-dot" />
-          {new URL(source.url).hostname}
-        </span>
+        <span className="connected-pill">{new URL(source.url).hostname}</span>
       </div>
       <div className="candidate-grid">
         {source.candidates.map((definition) => (
@@ -570,6 +980,7 @@ function SavedWidget({
       widget={data.widget}
       initialDefinition={data.widget.definition}
       onBack={onBack}
+      onDeleted={onBack}
     />
   ) : (
     <Loading />
