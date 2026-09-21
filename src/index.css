@@ -225,6 +225,29 @@ textarea::placeholder {
   color: #666666;
   font-size: 11px;
 }
+.try-app-button {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--color-ink);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+.try-app-button:hover {
+  background: transparent;
+  box-shadow: 0 3px 8px #1111111f;
+}
 .live-dot {
   display: inline-block;
   width: 6px;
@@ -1759,7 +1782,7 @@ input.widget-name:focus {
     font-size: 11px;
   }
   .app-header {
-    gap: 18px;
+    gap: 10px;
   }
   .brand {
     font-size: 19px;
@@ -1772,7 +1795,12 @@ input.widget-name:focus {
     height: 27px;
   }
   .header-right {
-    gap: 0;
+    gap: 4px;
+  }
+  .try-app-button {
+    gap: 5px;
+    padding: 0 8px;
+    font-size: 10px;
   }
   .header-right .live-dot {
     display: none;

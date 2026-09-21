@@ -20,6 +20,7 @@ import {
   PictureInPicture2,
   Plus,
   RefreshCw,
+  Smartphone,
   Trash2,
 } from "lucide-react";
 import { api } from "../convex/_generated/api";
@@ -123,6 +124,15 @@ function ProductApp() {
         <div className="header-right">
           {isAuthenticated ? (
             <>
+              <a
+                className="try-app-button"
+                href="https://testflight.apple.com/join/KftakD2B"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Smartphone size={16} />
+                Try the app
+              </a>
               <button
                 className="icon-button"
                 aria-label="Sign out"
