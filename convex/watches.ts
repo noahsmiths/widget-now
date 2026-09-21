@@ -44,45 +44,29 @@ export function baseline(
 export const get = query({
   args: { widgetId: v.id("widgets") },
   returns: v.object({
-    watch: v.union(schema.doc("watches"), v.null()),
+    watches: v.array(schema.doc("watches")),
     recipient: v.union(v.string(), v.null()),
     configured: v.boolean(),
   }),
   handler: async (ctx, { widgetId }) => {
     const widget = await requireWidget(ctx, widgetId);
     const user = await ctx.db.get("users", widget.ownerId);
-    const watch = await ctx.db
+    const watches = await ctx.db
       .query("watches")
       .withIndex("by_widgetId", (q) => q.eq("widgetId", widgetId))
-      .unique();
+      .collect();
     return {
-      watch,
+      watches,
       recipient: user?.email ? emailAddress(user.email) : null,
       configured: mailReady(),
     };
   },
 });
 
-async function confirmation(
-  ctx: MutationCtx,
-  watch: Doc<"watches">,
-  source: Doc<"sources">,
-  name: string,
-) {
-  await queueEmail(
-    ctx,
-    watch,
-    "confirmation",
-    `Confirm your email watch · ${name}`,
-    `You asked Widget Now to email you when ${describeCondition(watch.condition, source.fields)}.\n\nReply CONFIRM to this email to start watching. Until then, no alerts will be sent.\n\nOpen widget: ${widgetLink(watch.widgetId)}\nSource: ${source.url}\n\nAfter confirming, reply PAUSE, RESUME, or LATEST, or describe a new condition. If you did not request this, ignore this email.`,
-  );
-}
-
 export const save = mutation({
   args: {
     widgetId: v.id("widgets"),
     condition: conditionValidator,
-    expectedRevision: v.union(v.number(), v.null()),
   },
   returns: v.id("watches"),
   handler: async (ctx, args) => {
@@ -90,33 +74,12 @@ export const save = mutation({
     const source = await ctx.db.get("sources", widget.sourceId);
     if (!source || source.status !== "ready")
       throw new ConvexError("Wait for the source to be ready.");
-    if (!mailReady())
-      throw new ConvexError("Email watches are not configured yet.");
     try {
       validateCondition(args.condition, source.fields);
     } catch (error) {
       throw new ConvexError(
         error instanceof Error ? error.message : "Invalid condition.",
       );
-    }
-    const existing = await ctx.db
-      .query("watches")
-      .withIndex("by_widgetId", (q) => q.eq("widgetId", widget._id))
-      .unique();
-    if ((existing?.revision ?? null) !== args.expectedRevision)
-      throw new ConvexError(
-        "This watch changed. Review its latest condition and try again.",
-      );
-    if (existing) {
-      if (!existing.verifiedAt)
-        throw new ConvexError("Confirm your email before changing this watch.");
-      await ctx.db.patch("watches", existing._id, {
-        condition: args.condition,
-        revision: existing.revision + 1,
-        deliveryError: null,
-        ...baseline(args.condition, source.fields),
-      });
-      return existing._id;
     }
     const watches = await ctx.db
       .query("watches")
@@ -137,15 +100,13 @@ export const save = mutation({
       recipient,
       condition: args.condition,
       revision: 1,
-      enabled: false,
-      verifiedAt: null,
+      enabled: true,
+      verifiedAt: Date.now(),
       ...baseline(args.condition, source.fields),
       lastNotifiedAt: null,
       lastConfirmationAt: Date.now(),
       deliveryError: null,
     });
-    const watch = (await ctx.db.get("watches", watchId))!;
-    await confirmation(ctx, watch, source, widget.name);
     return watchId;
   },
 });
@@ -155,8 +116,6 @@ export const setEnabled = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const watch = await requireWatch(ctx, args.watchId);
-    if (args.enabled && !watch.verifiedAt)
-      throw new ConvexError("Reply CONFIRM to your confirmation email first.");
     const source = await ctx.db.get("sources", watch.sourceId);
     if (!source) throw new ConvexError("Source not found.");
     await ctx.db.patch("watches", watch._id, {
@@ -168,38 +127,15 @@ export const setEnabled = mutation({
   },
 });
 
-export const resendConfirmation = mutation({
-  args: { watchId: v.id("watches") },
-  returns: v.null(),
-  handler: async (ctx, { watchId }) => {
-    const watch = await requireWatch(ctx, watchId);
-    if (watch.verifiedAt)
-      throw new ConvexError("Your email is already confirmed.");
-    if (Date.now() - watch.lastConfirmationAt < 5 * 60_000)
-      throw new ConvexError("Please wait five minutes before resending.");
-    if (!mailReady())
-      throw new ConvexError("Email watches are not configured yet.");
-    const source = await ctx.db.get("sources", watch.sourceId);
-    const widget = await ctx.db.get("widgets", watch.widgetId);
-    if (!source || !widget) throw new ConvexError("Widget not found.");
-    await ctx.db.patch("watches", watchId, {
-      lastConfirmationAt: Date.now(),
-      deliveryError: null,
-    });
-    await confirmation(ctx, watch, source, widget.name);
-    return null;
-  },
-});
-
 export async function removeWidgetWatch(
   ctx: MutationCtx,
   widgetId: Id<"widgets">,
 ) {
-  const watch = await ctx.db
+  const watches = await ctx.db
     .query("watches")
     .withIndex("by_widgetId", (q) => q.eq("widgetId", widgetId))
-    .unique();
-  if (watch) {
+    .collect();
+  for (const watch of watches) {
     await ctx.db.delete("watches", watch._id);
     await ctx.scheduler.runAfter(0, internal.watchMail.cleanupWatch, {
       watchId: watch._id,
@@ -212,7 +148,10 @@ export const remove = mutation({
   returns: v.null(),
   handler: async (ctx, { watchId }) => {
     const watch = await requireWatch(ctx, watchId);
-    await removeWidgetWatch(ctx, watch.widgetId);
+    await ctx.db.delete("watches", watch._id);
+    await ctx.scheduler.runAfter(0, internal.watchMail.cleanupWatch, {
+      watchId: watch._id,
+    });
     return null;
   },
 });
@@ -227,7 +166,7 @@ export async function evaluateSourceWatches(
     .withIndex("by_sourceId", (q) => q.eq("sourceId", source._id))
     .take(20);
   for (const watch of watches) {
-    if (!watch.enabled || !watch.verifiedAt) continue;
+    if (!watch.enabled) continue;
     const field = fields.find((item) => item.id === watch.condition.fieldId);
     const result = evaluateWatch(
       watch.condition,

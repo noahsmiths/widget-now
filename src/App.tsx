@@ -18,7 +18,6 @@ import {
   LogOut,
   Plus,
   RefreshCw,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { api } from "../convex/_generated/api";
@@ -394,11 +393,7 @@ function CreateWidget({
           </div>
         )}
         <button className="primary" disabled={pending}>
-          {pending ? (
-            <LoaderCircle size={17} className="spin" />
-          ) : (
-            <Sparkles size={17} />
-          )}
+          {pending && <LoaderCircle size={17} className="spin" />}
           {pending ? "Connecting…" : "Generate my widgets"}
           <ArrowRight size={16} />
         </button>
@@ -473,9 +468,6 @@ function SourceView({
   if (source.status !== "ready")
     return (
       <div className="generation-state">
-        <span className="generation-icon">
-          <Sparkles size={28} className="pulse" />
-        </span>
         <h2>Creating your widgets</h2>
         <p>{new URL(source.url).hostname}</p>
         <div className="generation-progress">

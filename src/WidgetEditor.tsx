@@ -16,11 +16,12 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
+  Globe,
   Redo2,
   RefreshCw,
   Save,
   Shapes,
-  Sparkles,
+  Sun,
   Trash2,
   Type,
   Undo2,
@@ -48,6 +49,11 @@ import { permitNavigation } from "./navigation";
 import { EmailWatch } from "./EmailWatch";
 
 type ResizeDirection = "ne" | "se" | "sw" | "nw";
+type ToolbarElementKind = "text" | "icon" | "shape";
+type ToolbarElement = Extract<
+  WidgetElement,
+  { kind: ToolbarElementKind }
+>;
 type ResizeEdges = {
   left: boolean;
   right: boolean;
@@ -71,6 +77,7 @@ const resizeDirections: ResizeDirection[] = [
 
 const dataElementHeight = 0.25;
 const elementInset = 6;
+const toolbarElementKinds: ToolbarElementKind[] = ["text", "icon", "shape"];
 let textMeasurementContext: CanvasRenderingContext2D | null = null;
 
 function contentWidth(
@@ -218,6 +225,57 @@ function newElementColor(definition: WidgetDefinitionV1) {
     : "#ffffff";
 }
 
+function ToolbarDragPreview({
+  element,
+  width,
+  height,
+  scale,
+}: {
+  element: ToolbarElement;
+  width: number;
+  height: number;
+  scale: number;
+}) {
+  const style = {
+    width,
+    height,
+    color: element.style.color,
+    fontSize: element.style.fontSize * scale,
+    fontWeight: element.style.fontWeight,
+    textAlign: element.style.align,
+    opacity: element.style.opacity,
+    padding: element.kind === "shape" ? 0 : 6 * scale,
+  } as const;
+  return (
+    <span className="toolbar-native-drag-image" aria-hidden="true" style={style}>
+      {element.kind === "text" && <span>{element.text}</span>}
+      {element.kind === "icon" && (
+        <Sun
+          size={Math.min(
+            element.style.fontSize * scale,
+            width - 12 * scale,
+            height - 12 * scale,
+          )}
+          strokeWidth={1.7}
+          style={{ display: "block" }}
+        />
+      )}
+      {element.kind === "shape" && (
+        <span
+          style={{
+            display: "block",
+            width: "100%",
+            height: "100%",
+            background: element.fill,
+            borderRadius:
+              element.shape === "ellipse" ? "50%" : element.radius * scale,
+          }}
+        />
+      )}
+    </span>
+  );
+}
+
 export function WidgetEditor({
   source,
   initialDefinition,
@@ -266,6 +324,8 @@ export function WidgetEditor({
     "canvas",
   );
   const [draggingFieldId, setDraggingFieldId] = useState<string | null>(null);
+  const [draggingElementKind, setDraggingElementKind] =
+    useState<ToolbarElementKind | null>(null);
   const [dropOverWidget, setDropOverWidget] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(480);
   const canvasContainer = useRef<HTMLDivElement>(null);
@@ -399,7 +459,12 @@ export function WidgetEditor({
       undefined,
       position,
     );
-    const element = fittedElement(nextElement, source.fields, canvas);
+    const element = fittedElement(
+      nextElement,
+      source.fields,
+      canvas,
+      position ? { horizontal: "left", vertical: "top" } : undefined,
+    );
     change({ ...definition, elements: [...definition.elements, element] });
     setSelectedId(element.id);
   }
@@ -419,7 +484,49 @@ export function WidgetEditor({
   }
   function endFieldDrag() {
     setDraggingFieldId(null);
+    setDraggingElementKind(null);
     setDropOverWidget(false);
+  }
+  function defaultToolbarElement(kind: ToolbarElementKind): ToolbarElement {
+    return fittedElement(
+      newElement(kind, newElementColor(definition)),
+      source.fields,
+      canvas,
+    ) as ToolbarElement;
+  }
+  function toolbarDragPreview(kind: ToolbarElementKind) {
+    const element = defaultToolbarElement(kind);
+    return (
+      <ToolbarDragPreview
+        element={element}
+        width={previewWidth * element.frame.width}
+        height={canvas.height * scale * element.frame.height}
+        scale={scale}
+      />
+    );
+  }
+  function beginToolbarDrag(
+    event: DragEvent<HTMLButtonElement>,
+    kind: ToolbarElementKind,
+  ) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    fieldGrab.current = {
+      x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+      y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
+    };
+    const element = defaultToolbarElement(kind);
+    draggedFrame.current = element.frame;
+    event.dataTransfer.setData("application/widget-element", kind);
+    event.dataTransfer.effectAllowed = "copy";
+    const image = event.currentTarget.querySelector(
+      ".toolbar-native-drag-image",
+    ) as HTMLElement;
+    event.dataTransfer.setDragImage(
+      image,
+      image.offsetWidth * fieldGrab.current.x,
+      image.offsetHeight * fieldGrab.current.y,
+    );
+    setDraggingElementKind(kind);
   }
   function removeSelected() {
     change({
@@ -577,22 +684,12 @@ export function WidgetEditor({
           </div>
         </div>
         <div className="row">
-          <button
-            className="icon-button"
-            aria-label="Undo"
-            disabled={!state.past.length || saving}
-            onClick={() => dispatch({ type: "undo" })}
-          >
-            <Undo2 size={18} />
-          </button>
-          <button
-            className="icon-button"
-            aria-label="Redo"
-            disabled={!state.future.length || saving}
-            onClick={() => dispatch({ type: "redo" })}
-          >
-            <Redo2 size={18} />
-          </button>
+          <EmailWatch
+            widgetId={target?.widgetId ?? null}
+            fields={source.fields}
+            onSaveWidget={saveDesign}
+            disabled={saving}
+          />
           <button
             className="primary"
             disabled={saving || (target !== null && !dirty)}
@@ -621,16 +718,6 @@ export function WidgetEditor({
           {notice}
         </div>
       )}
-      <div className="editor-live-bar">
-        <div className="editor-live-actions">
-          <EmailWatch
-            widgetId={target?.widgetId ?? null}
-            fields={source.fields}
-            onSaveWidget={saveDesign}
-            disabled={saving}
-          />
-        </div>
-      </div>
       <div
         className="editor-mobile-tabs"
         role="tablist"
@@ -786,19 +873,18 @@ export function WidgetEditor({
               })}
             </div>
             <div className="source-footer">
-              <div className="panel-title">Source</div>
-              <a href={source.url} target="_blank" rel="noreferrer">
-                {new URL(source.url).hostname} ↗
-              </a>
+              <div className="source-footer-heading">
+                <span>Source</span>
+                <a href={source.url} target="_blank" rel="noreferrer">
+                  {new URL(source.url).hostname} ↗
+                </a>
+              </div>
               {!target && <p>Refresh starts after saving</p>}
               {staleFields && (
                 <p className="stale">
                   Some values are stale. Showing their last successful
                   observations.
                 </p>
-              )}
-              {source.lastAttemptAt && (
-                <p>Last attempt {timeLabel(source.lastAttemptAt)}</p>
               )}
               {source.refreshError && (
                 <p className="stale" role="alert">
@@ -820,9 +906,24 @@ export function WidgetEditor({
                   </button>
                 ))}
               </div>
-              <span className="canvas-scale">
-                {Math.round(scale * 100)}% preview
-              </span>
+              <div className="canvas-history">
+                <button
+                  className="icon-button"
+                  aria-label="Undo"
+                  disabled={!state.past.length || saving}
+                  onClick={() => dispatch({ type: "undo" })}
+                >
+                  <Undo2 size={16} />
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label="Redo"
+                  disabled={!state.future.length || saving}
+                  onClick={() => dispatch({ type: "redo" })}
+                >
+                  <Redo2 size={16} />
+                </button>
+              </div>
             </div>
             <div
               className="canvas-stage"
@@ -830,11 +931,14 @@ export function WidgetEditor({
               onClick={() => setSelectedId(null)}
             >
               <div
-                className={`canvas-drop-zone ${draggingFieldId ? "can-drop" : ""} ${dropOverWidget ? "drop-over" : ""}`}
+                className={`canvas-drop-zone ${draggingFieldId || draggingElementKind ? "can-drop" : ""} ${dropOverWidget ? "drop-over" : ""}`}
                 onDragOver={(event) => {
                   if (
                     event.dataTransfer.types.includes(
                       "application/widget-field",
+                    ) ||
+                    event.dataTransfer.types.includes(
+                      "application/widget-element",
                     )
                   ) {
                     event.preventDefault();
@@ -862,6 +966,15 @@ export function WidgetEditor({
                     add(
                       "data",
                       id,
+                      dragPosition(event, event.currentTarget),
+                    );
+                  const kind = event.dataTransfer.getData(
+                    "application/widget-element",
+                  );
+                  if (toolbarElementKinds.includes(kind as ToolbarElementKind))
+                    add(
+                      kind as ToolbarElementKind,
+                      undefined,
                       dragPosition(event, event.currentTarget),
                     );
                   endFieldDrag();
@@ -943,91 +1056,111 @@ export function WidgetEditor({
                   }}
                 />
               </div>
-              <p className="canvas-caption">
-                {sizes[definition.size].label} widget <span>·</span>{" "}
-                {canvas.width} × {canvas.height}
-              </p>
             </div>
             <div className="add-toolbar">
-              <button onClick={() => add("text")}>
+              <button
+                onClick={() => add("text")}
+                draggable
+                onDragStart={(event) => beginToolbarDrag(event, "text")}
+                onDragEnd={endFieldDrag}
+              >
                 <Type size={16} />
                 Text
+                {toolbarDragPreview("text")}
               </button>
-              <button onClick={() => add("icon")}>
-                <Sparkles size={16} />
+              <button
+                onClick={() => add("icon")}
+                draggable
+                onDragStart={(event) => beginToolbarDrag(event, "icon")}
+                onDragEnd={endFieldDrag}
+              >
+                <Globe size={16} />
                 Icon
+                {toolbarDragPreview("icon")}
               </button>
-              <button onClick={() => add("shape")}>
+              <button
+                onClick={() => add("shape")}
+                draggable
+                onDragStart={(event) => beginToolbarDrag(event, "shape")}
+                onDragEnd={endFieldDrag}
+              >
                 <Shapes size={16} />
                 Shape
+                {toolbarDragPreview("shape")}
               </button>
             </div>
           </section>
           <aside className="property-panel">
-            <div className="panel-title">Appearance</div>
-            <Property label="Widget background">
-              <input
-                type="color"
-                aria-label="Widget background"
-                value={definition.background}
-                onChange={(event) =>
-                  change({
-                    ...definition,
-                    background: event.target.value,
-                    theme: "custom",
-                  })
-                }
-              />
-            </Property>
-            <div className="theme-presets">
-              {[
-                {
-                  name: "White",
-                  background: "#ffffff",
-                  foreground: "#111111",
-                  theme: "light",
-                },
-                {
-                  name: "Light grey",
-                  background: "#f3f3f3",
-                  foreground: "#111111",
-                  theme: "light",
-                },
-                {
-                  name: "Black",
-                  background: "#111111",
-                  foreground: "#ffffff",
-                  theme: "dark",
-                },
-                {
-                  name: "Blue",
-                  background: "#2563eb",
-                  foreground: "#ffffff",
-                  theme: "dark",
-                },
-              ].map((theme) => (
-                <button
-                  key={theme.name}
-                  aria-label={`${theme.name} theme`}
-                  title={theme.name}
-                  style={{ background: theme.background }}
-                  onClick={() =>
-                    change({
-                      ...definition,
-                      background: theme.background,
-                      theme: theme.theme as WidgetDefinitionV1["theme"],
-                      elements: definition.elements.map((element) => ({
-                        ...element,
-                        style: { ...element.style, color: theme.foreground },
-                      })),
-                    })
-                  }
-                />
-              ))}
-            </div>
-            {selected ? (
+            {!selected && (
               <>
-                <div className="panel-divider" />
+                <div className="panel-title">Appearance</div>
+                <Property label="Widget background">
+                  <input
+                    type="color"
+                    aria-label="Widget background"
+                    value={definition.background}
+                    onChange={(event) =>
+                      change({
+                        ...definition,
+                        background: event.target.value,
+                        theme: "custom",
+                      })
+                    }
+                  />
+                </Property>
+                <div className="theme-presets">
+                  {[
+                    {
+                      name: "White",
+                      background: "#ffffff",
+                      foreground: "#111111",
+                      theme: "light",
+                    },
+                    {
+                      name: "Light grey",
+                      background: "#f3f3f3",
+                      foreground: "#111111",
+                      theme: "light",
+                    },
+                    {
+                      name: "Black",
+                      background: "#111111",
+                      foreground: "#ffffff",
+                      theme: "dark",
+                    },
+                    {
+                      name: "Blue",
+                      background: "#2563eb",
+                      foreground: "#ffffff",
+                      theme: "dark",
+                    },
+                  ].map((theme) => (
+                    <button
+                      key={theme.name}
+                      aria-label={`${theme.name} theme`}
+                      title={theme.name}
+                      style={{ background: theme.background }}
+                      onClick={() =>
+                        change({
+                          ...definition,
+                          background: theme.background,
+                          theme: theme.theme as WidgetDefinitionV1["theme"],
+                          elements: definition.elements.map((element) => ({
+                            ...element,
+                            style: {
+                              ...element.style,
+                              color: theme.foreground,
+                            },
+                          })),
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+            {selected && (
+              <>
                 <div className="panel-title">
                   {selected.kind === "data"
                     ? "Live field"
@@ -1375,11 +1508,6 @@ export function WidgetEditor({
                   </button>
                 </div>
               </>
-            ) : (
-              <div className="selection-empty">
-                <Sparkles size={24} />
-                <p>Select an element to edit it.</p>
-              </div>
             )}
             <div className="panel-divider" />
             <div className="panel-title">Layers</div>

@@ -105,26 +105,12 @@ export const apply = internalMutation({
     let updated = watch;
     if (watch.revision !== reply.watchRevision) {
       text = `This watch changed while your reply was being processed. Its current condition is: ${describeCondition(watch.condition, source.fields)}. Please reply again with your instruction.`;
-    } else if (command.kind === "confirm" && !watch.verifiedAt) {
-      const patch = {
-        enabled: true,
-        verifiedAt: Date.now(),
-        revision: watch.revision + 1,
-        ...baseline(watch.condition, source.fields),
-      };
-      await ctx.db.patch("watches", watch._id, patch);
-      updated = { ...watch, ...patch };
-      text = `Confirmed. I'll email you when ${describeCondition(watch.condition, source.fields)}. Checks run with your widget's 15-minute refresh. If the condition is already true, I'll wait for it to become false and then true again.\n\nReply PAUSE, RESUME, LATEST, or describe a new condition.`;
     } else if (command.kind === "pause") {
       const patch = { enabled: false, revision: watch.revision + 1 };
       await ctx.db.patch("watches", watch._id, patch);
       updated = { ...watch, ...patch };
-      text = watch.verifiedAt
-        ? "Your email watch is paused. Your widget will keep refreshing. Reply RESUME to restart alerts."
-        : "Your email watch is paused. No alerts will be sent. Reply CONFIRM if you decide to enable it.";
-    } else if (!watch.verifiedAt) {
       text =
-        "Reply CONFIRM to verify your email address and enable this watch first.";
+        "Your email watch is paused. Your widget will keep refreshing. Reply RESUME to restart alerts.";
     } else if (command.kind === "resume") {
       const patch = {
         enabled: true,

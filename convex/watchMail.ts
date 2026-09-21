@@ -84,7 +84,7 @@ export const readEmail = internalQuery({
     if (!watch) return null;
     if (email.kind !== "reply" && email.watchRevision !== watch.revision)
       return null;
-    if (email.kind === "alert" && (!watch.enabled || !watch.verifiedAt))
+    if (email.kind === "alert" && !watch.enabled)
       return null;
     if (email.kind === "confirmation" && watch.verifiedAt) return null;
     return email;
