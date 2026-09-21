@@ -119,13 +119,9 @@ textarea::placeholder {
   padding: 0;
 }
 .brand-icon {
-  border-radius: 8px;
-  background: #111111;
-  color: #fff;
   width: 32px;
   height: 32px;
-  display: grid;
-  place-items: center;
+  display: block;
   margin-right: 9px;
 }
 .brand-now {

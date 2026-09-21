@@ -3,13 +3,14 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 46;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		031424F4AF8AF27B34A53187 /* AccountSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6516BBD09B4BBE67ABF16D11 /* AccountSession.swift */; };
 		1387153B13C645EC11B8AC27 /* GitHubBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47668BA6E80C723402075D9C /* GitHubBrowser.swift */; };
 		16EC75EA01274E662365378E /* AccountSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6516BBD09B4BBE67ABF16D11 /* AccountSession.swift */; };
+		1B8D7A2E6F3C4D5A9B0E1F27 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2C9E8B3F7A4D5E6B0C1F2A38 /* Assets.xcassets */; };
 		32F349EB60424D43D7B867E5 /* WidgetNowWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = C9B424CAB9844D50C6E75DC0 /* WidgetNowWidgets.appex */; };
 		40E865F7D5FA8923B6D7BD0C /* ConvexMobile in Frameworks */ = {isa = PBXBuildFile; productRef = C9A98D4460EED8AADB3CB7BA /* ConvexMobile */; };
 		48F9D6976927E1FF3B71C394 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 42943226D85DF8A5FA4D6BAD /* Foundation.framework */; };
@@ -48,6 +49,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2C9E8B3F7A4D5E6B0C1F2A38 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		31397E596EEA3822161B038C /* WidgetNowWidgets.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = WidgetNowWidgets.entitlements; sourceTree = "<group>"; };
 		38A383401C75E5E082B76DC7 /* WidgetNow.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = WidgetNow.entitlements; sourceTree = "<group>"; };
 		42943226D85DF8A5FA4D6BAD /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
@@ -103,7 +105,6 @@
 				6EB3AC88CA86BEB2847CA7D8 /* WidgetCanvas.swift */,
 				6516BBD09B4BBE67ABF16D11 /* AccountSession.swift */,
 			);
-			name = Shared;
 			path = Shared;
 			sourceTree = "<group>";
 		};
@@ -112,10 +113,10 @@
 			children = (
 				ED6D2372CCC2C61990155D3B /* WidgetNowApp.swift */,
 				47668BA6E80C723402075D9C /* GitHubBrowser.swift */,
+				2C9E8B3F7A4D5E6B0C1F2A38 /* Assets.xcassets */,
 				DFC05A66FDFF9E1D6D6515B8 /* Info.plist */,
 				38A383401C75E5E082B76DC7 /* WidgetNow.entitlements */,
 			);
-			name = App;
 			path = App;
 			sourceTree = "<group>";
 		};
@@ -151,7 +152,6 @@
 				7ECD4D76F171EEE146046CF8 /* Info.plist */,
 				31397E596EEA3822161B038C /* WidgetNowWidgets.entitlements */,
 			);
-			name = WidgetExtension;
 			path = WidgetExtension;
 			sourceTree = "<group>";
 		};
@@ -208,8 +208,6 @@
 			attributes = {
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 2620;
-				TargetAttributes = {
-				};
 			};
 			buildConfigurationList = D485FB125F52A2501014993B /* Build configuration list for PBXProject "WidgetNow" */;
 			compatibilityVersion = "Xcode 3.2";
@@ -220,11 +218,9 @@
 				Base,
 			);
 			mainGroup = 348E7B932BFD3E8FFBB4CA06;
-			minimizedProjectReferenceProxies = 0;
 			packageReferences = (
 				641B4C274C0B65AFCBBC20EB /* XCRemoteSwiftPackageReference "convex-swift" */,
 			);
-			preferredProjectObjectVersion = 77;
 			productRefGroup = C270899C5E73EAEE860F208B /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -247,6 +243,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1B8D7A2E6F3C4D5A9B0E1F27 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -295,6 +292,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = WidgetExtension/WidgetNowWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2H58R69UA7;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WidgetExtension/Info.plist;
@@ -371,11 +369,15 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = App/WidgetNow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2H58R69UA7;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.widgetnow.companion;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = NO;
@@ -454,6 +456,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = WidgetExtension/WidgetNowWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2H58R69UA7;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = WidgetExtension/Info.plist;
@@ -475,11 +478,15 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = App/WidgetNow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 2H58R69UA7;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.widgetnow.companion;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = NO;

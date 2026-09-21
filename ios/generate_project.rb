@@ -14,12 +14,13 @@ widget_group = project.main_group.new_group("WidgetExtension", "WidgetExtension"
 
 {
   shared => %w[WidgetModels.swift WidgetCanvas.swift AccountSession.swift],
-  app_group => %w[WidgetNowApp.swift GitHubBrowser.swift Info.plist WidgetNow.entitlements],
+  app_group => %w[WidgetNowApp.swift GitHubBrowser.swift Assets.xcassets Info.plist WidgetNow.entitlements],
   widget_group => %w[WidgetNowWidgets.swift Info.plist WidgetNowWidgets.entitlements]
 }.each do |group, names|
   names.each do |name|
     file = group.new_file(name)
     app.source_build_phase.add_file_reference(file) if group == shared || (group == app_group && name.end_with?(".swift"))
+    app.resources_build_phase.add_file_reference(file) if group == app_group && name == "Assets.xcassets"
     widget.source_build_phase.add_file_reference(file) if group == shared || (group == widget_group && name.end_with?(".swift"))
   end
 end

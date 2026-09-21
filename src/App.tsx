@@ -15,7 +15,6 @@ import {
   Bell,
   Check,
   Globe,
-  Grid2X2,
   LoaderCircle,
   LogOut,
   PictureInPicture2,
@@ -98,9 +97,7 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <button className="brand" onClick={home}>
-          <span className="brand-icon">
-            <Grid2X2 size={19} />
-          </span>
+          <img className="brand-icon" src="/widget.svg" alt="" />
           widget<span className="brand-now">now</span>
         </button>
         <nav>
