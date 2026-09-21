@@ -622,31 +622,7 @@ export function WidgetEditor({
         </div>
       )}
       <div className="editor-live-bar">
-        <div className="editor-live-status">
-          <span className={`live-dot ${staleFields ? "stale-dot" : ""}`} />
-          <span>{staleFields ? "Stale data" : "Live data"}</span>
-          <span className="editor-live-updated">
-            {source.refreshing
-              ? "Refreshing…"
-              : `Updated ${timeLabel(source.lastSuccessAt)}`}
-          </span>
-        </div>
         <div className="editor-live-actions">
-          <button
-            className="secondary"
-            disabled={saving || !target || source.refreshing}
-            onClick={() => {
-              void refresh({ sourceId: source._id }).catch((err: unknown) =>
-                setError(errorMessage(err)),
-              );
-            }}
-          >
-            <RefreshCw
-              size={15}
-              className={source.refreshing ? "spin" : ""}
-            />
-            {source.refreshing ? "Refreshing…" : "Refresh now"}
-          </button>
           <EmailWatch
             widgetId={target?.widgetId ?? null}
             fields={source.fields}
@@ -669,7 +645,7 @@ export function WidgetEditor({
             onClick={() => setMobilePanel(panel)}
           >
             {panel === "data"
-              ? "Live data"
+              ? "Extracted data"
               : panel === "canvas"
                 ? "Widget"
                 : "Style"}
@@ -682,9 +658,33 @@ export function WidgetEditor({
           aria-busy={saving}
         >
           <aside className="data-panel">
-            <div className="panel-title">
-              <span>Live data</span>
-              <span className="count">{source.fields.length}</span>
+            <div className="data-panel-header">
+              <div>
+                <div className="panel-title">
+                  <span>Extracted data</span>
+                </div>
+                <p className="data-updated">
+                  {source.refreshing
+                    ? "Refreshing…"
+                    : `Updated ${timeLabel(source.lastSuccessAt)}`}
+                </p>
+              </div>
+              <button
+                className="secondary data-refresh"
+                aria-label="Refresh extracted data"
+                title="Refresh extracted data"
+                disabled={saving || !target || source.refreshing}
+                onClick={() => {
+                  void refresh({ sourceId: source._id }).catch((err: unknown) =>
+                    setError(errorMessage(err)),
+                  );
+                }}
+              >
+                <RefreshCw
+                  size={13}
+                  className={source.refreshing ? "spin" : ""}
+                />
+              </button>
             </div>
             <div className="field-list">
               {source.fields.map((field) => {
