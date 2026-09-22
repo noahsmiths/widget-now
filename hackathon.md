@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5-mini via the OpenAI provider
 - **Started:** 2026-09-11T22:30:53Z
-- **Last updated:** 2026-09-22T00:14:46Z
+- **Last updated:** 2026-09-22T04:27:59Z
 
 ## Log
 
@@ -97,3 +97,10 @@ rules. Added deterministic contrast repair, background-first shape ordering, str
 limits, and correct currency-prefix formatting in web and iOS renderers. The design-selection
 page also gained a confirmed generation-delete action (`convex/pipeline.ts`, `shared/widget.ts`,
 `ios/Shared/WidgetModels.swift`, `src/App.tsx`, `src/ui.ts`).
+
+### 2026-09-22 - c839f54
+Reworked widget generation around 12×12 and 24×12 placement grids with deterministic content
+measurement, so the AI chooses hierarchy and position while the backend derives safe bounding
+boxes for square and rectangle designs. Replaced browser drag ghosts with live cursor and canvas
+placement previews, added save-state feedback, and allowed manual refreshes before a widget is
+saved (`convex/pipeline.ts`, `convex/sources.ts`, `src/WidgetEditor.tsx`, `src/editorState.ts`).
