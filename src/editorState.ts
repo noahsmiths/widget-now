@@ -59,7 +59,7 @@ export function newElement(
         fieldId: field.id,
         label: formatDataFieldTitle(field.label),
         showLabel: true,
-        showUnit: true,
+        showUnit: false,
         precision: 0,
       };
     }

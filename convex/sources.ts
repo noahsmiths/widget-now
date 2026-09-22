@@ -28,10 +28,7 @@ import type { MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { removeWidgetWatch } from "./watches";
 
-export async function purgeSource(
-  ctx: MutationCtx,
-  source: Doc<"sources">,
-) {
+export async function purgeSource(ctx: MutationCtx, source: Doc<"sources">) {
   if (source.workflowId)
     await workflow.cancel(ctx, source.workflowId as WorkflowId);
   const widgets = ctx.db
@@ -192,8 +189,16 @@ export const finishGeneration = internalMutation({
   },
 });
 
-async function beginRefresh(ctx: MutationCtx, source: Doc<"sources">) {
-  if (source.refreshing || source.savedCount < 1 || source.status !== "ready")
+async function beginRefresh(
+  ctx: MutationCtx,
+  source: Doc<"sources">,
+  savedOnly: boolean,
+) {
+  if (
+    source.refreshing ||
+    (savedOnly && source.savedCount < 1) ||
+    source.status !== "ready"
+  )
     return false;
   const run = source.refreshRun + 1;
   await ctx.db.patch("sources", source._id, {
@@ -220,7 +225,7 @@ export const requestRefresh = mutation({
   args: { sourceId: v.id("sources") },
   returns: v.boolean(),
   handler: async (ctx, args) =>
-    beginRefresh(ctx, await requireSource(ctx, args.sourceId)),
+    beginRefresh(ctx, await requireSource(ctx, args.sourceId), false),
 });
 
 export const dispatchRefreshes = internalMutation({
@@ -233,7 +238,7 @@ export const dispatchRefreshes = internalMutation({
         q.gt("nextRefreshAt", null).lte("nextRefreshAt", Date.now()),
       )
       .take(20);
-    for (const source of due) await beginRefresh(ctx, source);
+    for (const source of due) await beginRefresh(ctx, source, true);
     if (due.length === 20)
       await ctx.scheduler.runAfter(0, internal.sources.dispatchRefreshes, {});
     return null;

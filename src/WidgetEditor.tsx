@@ -8,6 +8,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
+import { createPortal, flushSync } from "react-dom";
 import { useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
 import type { Doc, Id } from "../convex/_generated/dataModel";
@@ -21,7 +22,6 @@ import {
   RefreshCw,
   Save,
   Shapes,
-  Sun,
   Trash2,
   Type,
   Undo2,
@@ -64,14 +64,50 @@ type Gesture = {
   mode: "move" | "resize";
   edges?: ResizeEdges;
 };
+type ElementSize = Pick<WidgetElement["frame"], "width" | "height">;
+type DragPayload =
+  | {
+      type: "field";
+      fieldId: string;
+      frame: WidgetElement["frame"];
+      elements: WidgetElement[];
+    }
+  | {
+      type: "element";
+      kind: ToolbarElementKind;
+      frame: WidgetElement["frame"];
+      elements: WidgetElement[];
+    };
 
 const resizeDirections: ResizeDirection[] = ["ne", "se", "sw", "nw"];
 
-const dataElementHeight = 0.25;
 const elementInset = 6;
-const toolbarElementKinds: ToolbarElementKind[] = ["text", "icon", "shape"];
 let textMeasurementContext: CanvasRenderingContext2D | null = null;
 let textMeasurementElement: HTMLDivElement | null = null;
+let transparentDragImage: HTMLCanvasElement | null = null;
+
+function dragImage() {
+  transparentDragImage ??= document.getElementById(
+    "widget-transparent-drag-image",
+  ) as HTMLCanvasElement | null;
+  if (!transparentDragImage) {
+    transparentDragImage = document.createElement("canvas");
+    transparentDragImage.id = "widget-transparent-drag-image";
+    transparentDragImage.width = 1;
+    transparentDragImage.height = 1;
+    Object.assign(transparentDragImage.style, {
+      position: "fixed",
+      top: "0",
+      left: "0",
+      width: "1px",
+      height: "1px",
+      opacity: "0",
+      pointerEvents: "none",
+    });
+    document.body.append(transparentDragImage);
+  }
+  return transparentDragImage;
+}
 
 function measuredTextSize(
   text: string,
@@ -191,14 +227,15 @@ function dataElements(
   position = { x: 0.1, y: 0.35 },
 ): {
   frame: WidgetElement["frame"];
-  labelHeight: number;
-  valueHeight: number;
-  gap: number;
   elements: WidgetElement[];
 } {
   const label = formatDataFieldTitle(field.label);
   const labelWidth = contentWidth(label, 12, canvas.width);
-  const valueWidth = contentWidth(formatValue(field), 28, canvas.width);
+  const valueWidth = contentWidth(
+    formatValue(field, 0, true),
+    28,
+    canvas.width,
+  );
   const labelHeight = contentHeight(12, canvas.height);
   const valueHeight = contentHeight(28, canvas.height);
   const gap = 0.01;
@@ -217,9 +254,6 @@ function dataElements(
   >;
   return {
     frame: group,
-    labelHeight,
-    valueHeight,
-    gap,
     elements: [
       {
         ...title,
@@ -265,58 +299,51 @@ function newElementColor(definition: WidgetDefinitionV1) {
     : "#ffffff";
 }
 
-function ToolbarDragPreview({
-  element,
-  width,
-  height,
-  scale,
+function CursorDragPreview({
+  payload,
+  point,
+  definition,
+  fields,
+  previewWidth,
 }: {
-  element: ToolbarElement;
-  width: number;
-  height: number;
-  scale: number;
+  payload: DragPayload;
+  point: { x: number; y: number };
+  definition: WidgetDefinitionV1;
+  fields: DataField[];
+  previewWidth: number;
 }) {
-  const style = {
-    width,
-    height,
-    color: element.style.color,
-    fontSize: element.style.fontSize * scale,
-    fontWeight: element.style.fontWeight,
-    textAlign: element.style.align,
-    opacity: element.style.opacity,
-    padding: element.kind === "shape" ? 0 : 6 * scale,
-  } as const;
-  return (
-    <span
-      className="toolbar-native-drag-image"
+  const canvas = sizes[definition.size];
+  const scale = previewWidth / canvas.width;
+  return createPortal(
+    <div
+      className="cursor-drag-preview"
       aria-hidden="true"
-      style={style}
+      style={{
+        left: point.x,
+        top: point.y,
+        width: payload.frame.width * canvas.width * scale,
+        height: payload.frame.height * canvas.height * scale,
+      }}
     >
-      {element.kind === "text" && <span>{element.text}</span>}
-      {element.kind === "icon" && (
-        <Sun
-          size={Math.min(
-            element.style.fontSize * scale,
-            width - 12 * scale,
-            height - 12 * scale,
-          )}
-          strokeWidth={1.7}
-          style={{ display: "block" }}
-        />
-      )}
-      {element.kind === "shape" && (
-        <span
-          style={{
-            display: "block",
-            width: "100%",
-            height: "100%",
-            background: element.fill,
-            borderRadius:
-              element.shape === "ellipse" ? "50%" : element.radius * scale,
+      <div
+        style={{
+          position: "absolute",
+          left: -payload.frame.x * canvas.width * scale,
+          top: -payload.frame.y * canvas.height * scale,
+        }}
+      >
+        <WidgetRenderer
+          definition={{
+            ...definition,
+            background: "transparent",
+            elements: payload.elements,
           }}
+          fields={fields}
+          width={previewWidth}
         />
-      )}
-    </span>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -375,17 +402,20 @@ export function WidgetEditor({
   const [mobilePanel, setMobilePanel] = useState<"data" | "canvas" | "style">(
     "canvas",
   );
-  const [draggingFieldId, setDraggingFieldId] = useState<string | null>(null);
-  const [draggingElementKind, setDraggingElementKind] =
-    useState<ToolbarElementKind | null>(null);
+  const [dragging, setDragging] = useState<DragPayload | null>(null);
+  const [dragPreviewElements, setDragPreviewElements] = useState<
+    WidgetElement[]
+  >([]);
+  const [dragPoint, setDragPoint] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const [dropOverWidget, setDropOverWidget] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(480);
   const canvasContainer = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const lastTextClick = useRef<{ id: string; time: number } | null>(null);
   const textCaret = useRef<{ id: string; offset: number } | null>(null);
-  const fieldGrab = useRef({ x: 0.5, y: 0.5 });
-  const draggedFrame = useRef({ width: 0.35, height: dataElementHeight });
+  const dragPayload = useRef<DragPayload | null>(null);
   const save = useMutation(api.widgets.save);
   const remove = useMutation(api.widgets.remove);
   const refresh = useMutation(api.sources.requestRefresh);
@@ -402,14 +432,15 @@ export function WidgetEditor({
     definition.size === "square" ? 360 : 640,
   );
   const scale = previewWidth / canvas.width;
-  const renderedDefinition = previewElement
-    ? {
-        ...definition,
-        elements: definition.elements.map((element) =>
-          element.id === previewElement.id ? previewElement : element,
-        ),
-      }
-    : definition;
+  const renderedDefinition = {
+    ...definition,
+    elements: [
+      ...definition.elements.map((element) =>
+        element.id === previewElement?.id ? previewElement : element,
+      ),
+      ...dragPreviewElements,
+    ],
+  };
 
   useEffect(() => {
     const node = canvasContainer.current;
@@ -420,6 +451,36 @@ export function WidgetEditor({
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
+  useEffect(() => {
+    if (!dragging) return;
+    const trackDrag = (event: globalThis.DragEvent) => {
+      if (event.clientX || event.clientY)
+        setDragPoint({ x: event.clientX, y: event.clientY });
+    };
+    const allowDrop = (event: globalThis.DragEvent) => {
+      event.preventDefault();
+      trackDrag(event);
+    };
+    const finishDrop = (event: globalThis.DragEvent) => {
+      if (!dragPayload.current) return;
+      event.preventDefault();
+      dragPayload.current = null;
+      flushSync(() => {
+        setDragging(null);
+        setDragPreviewElements([]);
+        setDragPoint(null);
+        setDropOverWidget(false);
+      });
+    };
+    window.addEventListener("drag", trackDrag, true);
+    window.addEventListener("dragover", allowDrop, true);
+    window.addEventListener("drop", finishDrop);
+    return () => {
+      window.removeEventListener("drag", trackDrag, true);
+      window.removeEventListener("dragover", allowDrop, true);
+      window.removeEventListener("drop", finishDrop);
+    };
+  }, [dragging]);
   useEffect(() => {
     if (!editingTextId) return;
     const frame = window.requestAnimationFrame(() => {
@@ -545,10 +606,6 @@ export function WidgetEditor({
     position?: { x: number; y: number },
   ) {
     if (kind === "data") {
-      if (definition.elements.length > 58) {
-        setError("A widget can have up to 60 elements.");
-        return;
-      }
       const field = source.fields.find((item) => item.id === fieldId);
       if (!field) return;
       const added = dataElements(
@@ -557,14 +614,7 @@ export function WidgetEditor({
         canvas,
         position,
       ).elements;
-      change({ ...definition, elements: [...definition.elements, ...added] });
-      setSelectedId(added[1].id);
-      if (window.matchMedia("(max-width: 850px)").matches)
-        setMobilePanel("canvas");
-      return;
-    }
-    if (definition.elements.length >= 60) {
-      setError("A widget can have up to 60 elements.");
+      insertElements(added, true);
       return;
     }
     const nextElement = newElement(
@@ -579,26 +629,42 @@ export function WidgetEditor({
       canvas,
       position ? { horizontal: "left", vertical: "top" } : undefined,
     );
-    change({ ...definition, elements: [...definition.elements, element] });
-    setSelectedId(element.id);
+    insertElements([element]);
   }
-  function dragPosition(
+  function insertElements(elements: WidgetElement[], showCanvas = false) {
+    if (definition.elements.length + elements.length > 60) {
+      setError("A widget can have up to 60 elements.");
+      return;
+    }
+    change({ ...definition, elements: [...definition.elements, ...elements] });
+    setSelectedId(elements[elements.length - 1].id);
+    if (showCanvas && window.matchMedia("(max-width: 850px)").matches)
+      setMobilePanel("canvas");
+  }
+  function dropPosition(
     event: DragEvent<HTMLDivElement>,
     target: HTMLDivElement,
+    size: ElementSize,
   ) {
     const rect = target.getBoundingClientRect();
     return {
-      x:
-        (event.clientX - rect.left) / rect.width -
-        draggedFrame.current.width * fieldGrab.current.x,
-      y:
-        (event.clientY - rect.top) / rect.height -
-        draggedFrame.current.height * fieldGrab.current.y,
+      x: (event.clientX - rect.left) / rect.width - size.width / 2,
+      y: (event.clientY - rect.top) / rect.height - size.height / 2,
     };
   }
-  function endFieldDrag() {
-    setDraggingFieldId(null);
-    setDraggingElementKind(null);
+  function beginDrag(event: DragEvent<HTMLElement>, payload: DragPayload) {
+    dragPayload.current = payload;
+    setDragging(payload);
+    setDragPoint({ x: event.clientX, y: event.clientY });
+    event.dataTransfer.setData("text/plain", "widget-element");
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setDragImage(dragImage(), 0, 0);
+  }
+  function endDrag() {
+    dragPayload.current = null;
+    setDragging(null);
+    setDragPreviewElements([]);
+    setDragPoint(null);
     setDropOverWidget(false);
   }
   function defaultToolbarElement(kind: ToolbarElementKind): ToolbarElement {
@@ -608,39 +674,33 @@ export function WidgetEditor({
       canvas,
     ) as ToolbarElement;
   }
-  function toolbarDragPreview(kind: ToolbarElementKind) {
-    const element = defaultToolbarElement(kind);
-    return (
-      <ToolbarDragPreview
-        element={element}
-        width={previewWidth * element.frame.width}
-        height={canvas.height * scale * element.frame.height}
-        scale={scale}
-      />
-    );
-  }
   function beginToolbarDrag(
     event: DragEvent<HTMLButtonElement>,
     kind: ToolbarElementKind,
   ) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    fieldGrab.current = {
-      x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
-      y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
-    };
     const element = defaultToolbarElement(kind);
-    draggedFrame.current = element.frame;
-    event.dataTransfer.setData("application/widget-element", kind);
-    event.dataTransfer.effectAllowed = "copy";
-    const image = event.currentTarget.querySelector(
-      ".toolbar-native-drag-image",
-    ) as HTMLElement;
-    event.dataTransfer.setDragImage(
-      image,
-      image.offsetWidth * fieldGrab.current.x,
-      image.offsetHeight * fieldGrab.current.y,
-    );
-    setDraggingElementKind(kind);
+    beginDrag(event, {
+      type: "element",
+      kind,
+      frame: element.frame,
+      elements: [element],
+    });
+  }
+  function positionedDragElements(
+    payload: DragPayload,
+    position: { x: number; y: number },
+  ) {
+    const frame = clampFrame({ ...payload.frame, ...position });
+    const offsetX = frame.x - payload.frame.x;
+    const offsetY = frame.y - payload.frame.y;
+    return payload.elements.map((element) => ({
+      ...element,
+      frame: {
+        ...element.frame,
+        x: element.frame.x + offsetX,
+        y: element.frame.y + offsetY,
+      },
+    }));
   }
   function removeSelected() {
     change({
@@ -790,6 +850,15 @@ export function WidgetEditor({
 
   return (
     <div className="editor-shell">
+      {dragging && dragPoint && !dropOverWidget && (
+        <CursorDragPreview
+          payload={dragging}
+          point={dragPoint}
+          definition={definition}
+          fields={source.fields}
+          previewWidth={previewWidth}
+        />
+      )}
       <div className="editor-heading">
         <div className="editor-heading-left">
           <button
@@ -799,7 +868,7 @@ export function WidgetEditor({
           >
             <ArrowLeft size={19} />
           </button>
-          <div>
+          <div className="widget-title-group">
             <input
               className="widget-name"
               aria-label="Widget name"
@@ -813,9 +882,12 @@ export function WidgetEditor({
                 })
               }
             />
-            {(dirty || target) && (
-              <p>{dirty ? "Unsaved changes" : "All changes saved"}</p>
-            )}
+            <p
+              className={`widget-save-status${dirty || target ? " is-visible" : ""}`}
+              aria-live="polite"
+            >
+              {dirty ? "Unsaved changes" : "All changes saved"}
+            </p>
           </div>
         </div>
         <div className="row">
@@ -899,7 +971,7 @@ export function WidgetEditor({
                 className="secondary data-refresh"
                 aria-label="Refresh extracted data"
                 title="Refresh extracted data"
-                disabled={busy || !target || source.refreshing}
+                disabled={busy || source.refreshing}
                 onClick={() => {
                   void refresh({ sourceId: source._id }).catch((err: unknown) =>
                     setError(errorMessage(err)),
@@ -927,78 +999,25 @@ export function WidgetEditor({
                   <button
                     key={field.id}
                     type="button"
-                    className={`field-card ${used ? "field-used" : ""} ${draggingFieldId === field.id ? "field-dragging" : ""}`}
+                    className={`field-card ${used ? "field-used" : ""} ${dragging?.type === "field" && dragging.fieldId === field.id ? "field-dragging" : ""}`}
                     aria-label={`Add ${formatDataFieldTitle(field.label)}: ${formatValue(field)}`}
                     title="Click to add or drag onto the widget"
                     onClick={() => add("data", field.id)}
                     draggable
-                    onDragStart={(event) => {
-                      const rect = event.currentTarget.getBoundingClientRect();
-                      fieldGrab.current = {
-                        x: Math.max(
-                          0,
-                          Math.min(1, (event.clientX - rect.left) / rect.width),
-                        ),
-                        y: Math.max(
-                          0,
-                          Math.min(1, (event.clientY - rect.top) / rect.height),
-                        ),
-                      };
-                      event.dataTransfer.setData(
-                        "application/widget-field",
-                        field.id,
-                      );
-                      event.dataTransfer.effectAllowed = "copy";
-                      const image = event.currentTarget.querySelector(
-                        ".field-native-drag-image",
-                      ) as HTMLElement;
-                      draggedFrame.current = {
-                        width: layout.frame.width,
-                        height: layout.frame.height,
-                      };
-                      event.dataTransfer.setDragImage(
-                        image,
-                        image.offsetWidth * fieldGrab.current.x,
-                        image.offsetHeight * fieldGrab.current.y,
-                      );
-                      setDraggingFieldId(field.id);
-                    }}
-                    onDragEnd={endFieldDrag}
+                    onDragStart={(event) =>
+                      beginDrag(event, {
+                        type: "field",
+                        fieldId: field.id,
+                        frame: layout.frame,
+                        elements: layout.elements,
+                      })
+                    }
+                    onDragEnd={endDrag}
                   >
                     <span className="field-title">
                       {formatDataFieldTitle(field.label)}
                     </span>
                     <strong>{formatValue(field)}</strong>
-                    <span
-                      className="field-native-drag-image"
-                      aria-hidden="true"
-                      style={{
-                        width: previewWidth * layout.frame.width,
-                        height: canvas.height * scale * layout.frame.height,
-                        color: newElementColor(definition),
-                        background: "transparent",
-                        fontSize: 28 * scale,
-                        fontWeight: 600,
-                        textAlign: "center",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 12 * scale,
-                          height: canvas.height * scale * layout.labelHeight,
-                        }}
-                      >
-                        {formatDataFieldTitle(field.label)}
-                      </span>
-                      <strong
-                        style={{
-                          height: canvas.height * scale * layout.valueHeight,
-                          marginTop: canvas.height * scale * layout.gap,
-                        }}
-                      >
-                        {formatValue(field)}
-                      </strong>
-                    </span>
                   </button>
                 );
               })}
@@ -1010,7 +1029,6 @@ export function WidgetEditor({
                   {new URL(source.url).hostname} ↗
                 </a>
               </div>
-              {!target && <p>Refresh starts after saving</p>}
               {staleFields && (
                 <p className="stale">
                   Some values are stale. Showing their last successful
@@ -1065,18 +1083,24 @@ export function WidgetEditor({
               }}
             >
               <div
-                className={`canvas-drop-zone ${draggingFieldId || draggingElementKind ? "can-drop" : ""} ${dropOverWidget ? "drop-over" : ""}`}
+                className={`canvas-drop-zone ${dragging ? "can-drop" : ""} ${dropOverWidget ? "drop-over" : ""}`}
+                style={{
+                  width: previewWidth,
+                  height: canvas.height * scale,
+                }}
                 onDragOver={(event) => {
-                  if (
-                    event.dataTransfer.types.includes(
-                      "application/widget-field",
-                    ) ||
-                    event.dataTransfer.types.includes(
-                      "application/widget-element",
-                    )
-                  ) {
+                  const payload = dragPayload.current;
+                  if (payload) {
                     event.preventDefault();
                     event.dataTransfer.dropEffect = "copy";
+                    const position = dropPosition(
+                      event,
+                      event.currentTarget,
+                      payload.frame,
+                    );
+                    setDragPreviewElements(
+                      positionedDragElements(payload, position),
+                    );
                     setDropOverWidget(true);
                   }
                 }}
@@ -1088,26 +1112,24 @@ export function WidgetEditor({
                     event.clientY < rect.top ||
                     event.clientY > rect.bottom
                   ) {
+                    setDragPreviewElements([]);
                     setDropOverWidget(false);
                   }
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
-                  const id = event.dataTransfer.getData(
-                    "application/widget-field",
+                  const payload = dragPayload.current;
+                  if (!payload) return;
+                  const position = dropPosition(
+                    event,
+                    event.currentTarget,
+                    payload.frame,
                   );
-                  if (source.fields.some((field) => field.id === id))
-                    add("data", id, dragPosition(event, event.currentTarget));
-                  const kind = event.dataTransfer.getData(
-                    "application/widget-element",
+                  insertElements(
+                    positionedDragElements(payload, position),
+                    payload.type === "field",
                   );
-                  if (toolbarElementKinds.includes(kind as ToolbarElementKind))
-                    add(
-                      kind as ToolbarElementKind,
-                      undefined,
-                      dragPosition(event, event.currentTarget),
-                    );
-                  endFieldDrag();
+                  endDrag();
                 }}
               >
                 <WidgetRenderer
@@ -1128,6 +1150,12 @@ export function WidgetEditor({
                     if (editingTextId === elementId) setEditingTextId(null);
                   }}
                   renderOverlay={(element) => {
+                    if (
+                      dragPreviewElements.some(
+                        (preview) => preview.id === element.id,
+                      )
+                    )
+                      return null;
                     const frame =
                       selectedId === element.id && previewElement
                         ? previewElement.frame
@@ -1224,31 +1252,28 @@ export function WidgetEditor({
                 onClick={() => add("text")}
                 draggable
                 onDragStart={(event) => beginToolbarDrag(event, "text")}
-                onDragEnd={endFieldDrag}
+                onDragEnd={endDrag}
               >
                 <Type size={16} />
                 Text
-                {toolbarDragPreview("text")}
               </button>
               <button
                 onClick={() => add("icon")}
                 draggable
                 onDragStart={(event) => beginToolbarDrag(event, "icon")}
-                onDragEnd={endFieldDrag}
+                onDragEnd={endDrag}
               >
                 <Globe size={16} />
                 Icon
-                {toolbarDragPreview("icon")}
               </button>
               <button
                 onClick={() => add("shape")}
                 draggable
                 onDragStart={(event) => beginToolbarDrag(event, "shape")}
-                onDragEnd={endFieldDrag}
+                onDragEnd={endDrag}
               >
                 <Shapes size={16} />
                 Shape
-                {toolbarDragPreview("shape")}
               </button>
             </div>
           </section>

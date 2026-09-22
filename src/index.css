@@ -1158,16 +1158,19 @@ em {
   gap: 16px;
   min-width: 0;
 }
-.editor-heading-left > div {
+.widget-title-group {
+  display: flex;
   flex: 1;
+  flex-direction: column;
   min-width: 0;
 }
 input.widget-name {
   width: 100%;
   border: 0 !important;
-  padding: 3px 0 !important;
+  padding: 1px 0 0 !important;
   font-size: 23px;
   font-weight: 600;
+  line-height: 1.15;
   letter-spacing: -0.7px;
   background: transparent !important;
   max-width: none;
@@ -1175,10 +1178,15 @@ input.widget-name {
 input.widget-name:focus {
   outline: 0;
 }
-.editor-heading-left p {
+.widget-save-status {
+  min-height: 12px;
   font-size: 10px;
+  line-height: 12px;
   color: #737373;
-  margin-top: 1px;
+  visibility: hidden;
+}
+.widget-save-status.is-visible {
+  visibility: visible;
 }
 .editor-heading .row > .primary,
 .editor-heading .row > .danger-button,
@@ -1322,50 +1330,6 @@ input.widget-name:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.field-native-drag-image {
-  position: fixed;
-  left: -200vw;
-  top: -200vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  overflow: hidden;
-  padding: 0;
-  border-radius: 10px;
-  box-shadow: none;
-  pointer-events: none;
-  line-height: 1.15;
-  text-align: center;
-}
-.field-native-drag-image > span {
-  width: 100%;
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.field-native-drag-image > strong {
-  width: auto;
-  font-size: inherit;
-  font-weight: inherit;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  letter-spacing: -0.035em;
-}
-.toolbar-native-drag-image {
-  position: fixed;
-  left: -200vw;
-  top: -200vh;
-  display: block;
-  overflow: visible;
-  pointer-events: none;
-  line-height: 1.15;
-}
-.toolbar-native-drag-image > span {
-  display: block;
-  white-space: nowrap;
-}
 .source-footer {
   border-top: 1px solid #f0f0f0;
   margin-top: 12px;
@@ -1459,6 +1423,10 @@ input.widget-name:focus {
   background-size: 16px 16px;
   padding: 18px;
 }
+.canvas-drop-zone {
+  position: relative;
+  flex: 0 0 auto;
+}
 .canvas-drop-zone.can-drop {
   outline: 2px dashed #93c5fd;
   outline-offset: 8px;
@@ -1466,6 +1434,18 @@ input.widget-name:focus {
 .canvas-drop-zone.drop-over {
   outline: 2px solid var(--color-accent);
   outline-offset: 8px;
+}
+.cursor-drag-preview {
+  position: fixed;
+  z-index: 1000;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 2px 3px #1111114d);
+}
+.cursor-drag-preview .widget-reference {
+  border-radius: 0 !important;
+  box-shadow: none;
 }
 .add-toolbar {
   display: flex;
