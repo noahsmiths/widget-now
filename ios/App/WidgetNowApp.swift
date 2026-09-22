@@ -19,8 +19,15 @@ import WidgetKit
     private var pagesTask: Task<Void, Never>?
 
     func restore() async {
-        if case .success = await client.loginFromCache() { startCatalog() }
-        else { loading = false }
+        if case .success = await client.loginFromCache() {
+            if !signedIn { startCatalog() }
+            WidgetCenter.shared.reloadAllTimelines()
+        } else {
+            subscription?.cancel()
+            pagesTask?.cancel()
+            signedIn = false
+            loading = false
+        }
     }
 
     func login(email: String, password: String) async {
@@ -104,13 +111,16 @@ import WidgetKit
 }
 
 @main struct WidgetNowApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var account = AccountModel()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(account)
-                .task { await account.restore() }
+                .task(id: scenePhase) {
+                    if scenePhase == .active { await account.restore() }
+                }
                 .onOpenURL { url in
                     if url.scheme == "http" || url.scheme == "https" {
                         UIApplication.shared.open(url)

@@ -1,4 +1,5 @@
 import ConvexMobile
+import Darwin
 import Foundation
 import Security
 
@@ -82,6 +83,65 @@ enum SharedKeychain {
     }
 }
 
+private actor SessionRefreshGate {
+    private var locked = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func acquire() async {
+        if !locked {
+            locked = true
+            return
+        }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func release() {
+        if waiters.isEmpty {
+            locked = false
+        } else {
+            waiters.removeFirst().resume()
+        }
+    }
+}
+
+private enum SharedSessionRefresh {
+    private static let gate = SessionRefreshGate()
+
+    static func withLock<T>(_ operation: () async throws -> T) async throws -> T {
+        await gate.acquire()
+        do {
+            let result = try await withFileLock(operation)
+            await gate.release()
+            return result
+        } catch {
+            await gate.release()
+            throw error
+        }
+    }
+
+    private static func withFileLock<T>(_ operation: () async throws -> T) async throws -> T {
+        guard let directory = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: CompanionConfig.appGroup
+        ) else {
+            return try await operation()
+        }
+        let descriptor = Darwin.open(
+            directory.appendingPathComponent("session-refresh.lock").path,
+            O_CREAT | O_RDWR,
+            0o600
+        )
+        guard descriptor >= 0 else { return try await operation() }
+        defer { Darwin.close(descriptor) }
+
+        while Darwin.lockf(descriptor, F_TLOCK, 0) != 0 {
+            guard errno == EACCES || errno == EAGAIN else { return try await operation() }
+            try await Task<Never, Never>.sleep(nanoseconds: 50_000_000)
+        }
+        defer { Darwin.lockf(descriptor, F_ULOCK, 0) }
+        return try await operation()
+    }
+}
+
 final class AccountSession: AuthProvider {
     private let unauthenticated = ConvexClient(deploymentUrl: CompanionConfig.deploymentURL)
     private var credentials: (email: String, password: String)?
@@ -130,28 +190,32 @@ final class AccountSession: AuthProvider {
             guard result.success, let session = result.tokens else { throw SessionError.wrongPassword }
             tokens = session
         }
-        try SharedKeychain.save(tokens)
+        try await SharedSessionRefresh.withLock {
+            try SharedKeychain.save(tokens)
+        }
         onIdToken(tokens.accessToken)
         return tokens
     }
 
     func loginFromCache(onIdToken: @Sendable @escaping (String?) -> Void) async throws -> SessionTokens {
-        guard let existing = SharedKeychain.read() else { throw SessionError.invalidSession }
-        if existing.accessTokenExpiresAt > Date().timeIntervalSince1970 * 1000 + 60_000 {
-            onIdToken(existing.accessToken)
-            return existing
+        try await SharedSessionRefresh.withLock {
+            guard let existing = SharedKeychain.read() else { throw SessionError.invalidSession }
+            if existing.accessTokenExpiresAt > Date().timeIntervalSince1970 * 1000 + 10_000 {
+                onIdToken(existing.accessToken)
+                return existing
+            }
+            let refreshed: SessionTokens? = try await unauthenticated.mutation(
+                "auth:refreshSession", with: ["refreshToken": existing.refreshToken]
+            )
+            guard let refreshed else {
+                SharedKeychain.remove()
+                onIdToken(nil)
+                throw SessionError.invalidSession
+            }
+            try SharedKeychain.save(refreshed)
+            onIdToken(refreshed.accessToken)
+            return refreshed
         }
-        let refreshed: SessionTokens? = try await unauthenticated.mutation(
-            "auth:refreshSession", with: ["refreshToken": existing.refreshToken]
-        )
-        guard let refreshed else {
-            SharedKeychain.remove()
-            onIdToken(nil)
-            throw SessionError.invalidSession
-        }
-        try SharedKeychain.save(refreshed)
-        onIdToken(refreshed.accessToken)
-        return refreshed
     }
 
     func extractIdToken(from authResult: SessionTokens) -> String {
@@ -159,10 +223,12 @@ final class AccountSession: AuthProvider {
     }
 
     func logout() async throws {
-        if let token = SharedKeychain.read()?.refreshToken {
-            try? await unauthenticated.mutation("auth:signOut", with: ["refreshToken": token])
+        try await SharedSessionRefresh.withLock {
+            if let token = SharedKeychain.read()?.refreshToken {
+                try? await unauthenticated.mutation("auth:signOut", with: ["refreshToken": token])
+            }
+            SharedKeychain.remove()
         }
-        SharedKeychain.remove()
         WidgetCatalog.save([])
     }
 }
