@@ -1,6 +1,7 @@
 import Combine
 import ConvexMobile
 import SwiftUI
+import UIKit
 import WidgetKit
 
 @MainActor final class AccountModel: ObservableObject {
@@ -111,7 +112,9 @@ import WidgetKit
                 .environmentObject(account)
                 .task { await account.restore() }
                 .onOpenURL { url in
-                    if url.scheme == "widgetnow" && url.host == "setup" {
+                    if url.scheme == "http" || url.scheme == "https" {
+                        UIApplication.shared.open(url)
+                    } else if url.scheme == "widgetnow" && url.host == "setup" {
                         account.showSetup = true
                     }
                 }

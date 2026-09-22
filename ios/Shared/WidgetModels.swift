@@ -22,6 +22,7 @@ struct WidgetPage: Decodable {
 struct WidgetSnapshot: Decodable {
     let id: String
     let name: String
+    let sourceUrl: String
     let definition: WidgetDefinition
     let fields: [WidgetField]
     let updatedAt: Double

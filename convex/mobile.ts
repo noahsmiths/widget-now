@@ -34,6 +34,7 @@ export const get = query({
   returns: v.object({
     id: v.id("widgets"),
     name: v.string(),
+    sourceUrl: v.string(),
     definition: definitionValidator,
     fields: v.array(fieldValidator),
     updatedAt: v.number(),
@@ -45,6 +46,7 @@ export const get = query({
     return {
       id: widget._id,
       name: widget.name,
+      sourceUrl: source.url,
       definition: widget.definition,
       fields: source.fields,
       updatedAt: widget.updatedAt,

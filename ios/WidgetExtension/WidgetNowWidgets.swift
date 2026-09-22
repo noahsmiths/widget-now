@@ -107,6 +107,14 @@ struct DesignProvider<Selection: DesignSelection>: AppIntentTimelineProvider {
 struct DesignWidgetView: View {
     let entry: DesignEntry
 
+    private var targetURL: URL? {
+        if let sourceUrl = entry.snapshot?.sourceUrl,
+           let url = URL(string: sourceUrl) {
+            return url
+        }
+        return URL(string: "widgetnow://setup")
+    }
+
     var body: some View {
         Group {
             if let snapshot = entry.snapshot {
@@ -121,7 +129,7 @@ struct DesignWidgetView: View {
                 .containerBackground(for: .widget) { Color(.secondarySystemBackground) }
             }
         }
-        .widgetURL(URL(string: "widgetnow://setup"))
+        .widgetURL(targetURL)
     }
 }
 
