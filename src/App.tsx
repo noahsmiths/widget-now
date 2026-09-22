@@ -31,7 +31,11 @@ import { WidgetRenderer } from "./WidgetRenderer";
 import { WidgetEditor } from "./WidgetEditor";
 import { EmailWatch } from "./EmailWatch";
 import { SignInForm } from "./SignInForm";
-import { confirmWidgetDeletion, errorMessage } from "./ui";
+import {
+  confirmGenerationDeletion,
+  confirmWidgetDeletion,
+  errorMessage,
+} from "./ui";
 import { permitNavigation } from "./navigation";
 
 type Route =
@@ -257,7 +261,8 @@ function SignedOutHome() {
 
           <p className="home-pitch">
             Tired of checking the same websites and dashboards over and over?
-            Widget Now lets you turn any website into a live widget, along with optional email alerts for when data changes.
+            Widget Now lets you turn any website into a live widget, along with
+            optional email alerts for when data changes.
           </p>
 
           <button
@@ -388,8 +393,8 @@ function PrivacyPolicy() {
         <section>
           <h2>Retention and deletion</h2>
           <p>
-            We keep account and widget information while it is needed to
-            provide the service. Deleting a widget also deletes its associated
+            We keep account and widget information while it is needed to provide
+            the service. Deleting a widget also deletes its associated
             generation, source data, notification rules, and related mail
             records. Some limited records may remain temporarily in backups,
             security logs, or where retention is required by law.
@@ -400,8 +405,8 @@ function PrivacyPolicy() {
           <h2>Security</h2>
           <p>
             We use reasonable administrative and technical measures intended to
-            protect your information. No internet service can guarantee
-            complete security.
+            protect your information. No internet service can guarantee complete
+            security.
           </p>
         </section>
 
@@ -485,7 +490,10 @@ function Library({
   const pictureInPictureSupported = "documentPictureInPicture" in window;
 
   useEffect(() => {
-    window.localStorage.setItem("widget-gallery-order", JSON.stringify(widgetOrder));
+    window.localStorage.setItem(
+      "widget-gallery-order",
+      JSON.stringify(widgetOrder),
+    );
   }, [widgetOrder]);
 
   useEffect(() => {
@@ -530,17 +538,11 @@ function Library({
       : orderedWidgets.filter((widget) => widget._id === pipSelection);
 
   useEffect(() => {
-    if (
-      pipWindow &&
-      pipSelection === "all" &&
-      widgets.status === "CanLoadMore"
-    )
+    if (pipWindow && pipSelection === "all" && widgets.status === "CanLoadMore")
       widgets.loadMore(12);
   }, [pipSelection, pipWindow, widgets]);
 
-  async function openPictureInPicture(
-    selection: PictureInPictureSelection,
-  ) {
+  async function openPictureInPicture(selection: PictureInPictureSelection) {
     const api = window.documentPictureInPicture;
     if (!api) return;
     const widget =
@@ -577,8 +579,7 @@ function Library({
       nextWindow.addEventListener(
         "pagehide",
         () => {
-          if (pipWindowRef.current === nextWindow)
-            pipWindowRef.current = null;
+          if (pipWindowRef.current === nextWindow) pipWindowRef.current = null;
           setPipWindow((current) => (current === nextWindow ? null : current));
           setPipSelection((current) =>
             window.documentPictureInPicture?.window ? current : null,
@@ -597,9 +598,7 @@ function Library({
     setLibraryError(null);
     try {
       await remove({ widgetId: widget._id });
-      setWidgetOrder((current) =>
-        current.filter((id) => id !== widget._id),
-      );
+      setWidgetOrder((current) => current.filter((id) => id !== widget._id));
       if (pipSelection === widget._id) pipWindowRef.current?.close();
     } catch (error) {
       setLibraryError(errorMessage(error));
@@ -608,10 +607,7 @@ function Library({
     }
   }
 
-  function reorderWidgets(
-    draggedId: Id<"widgets">,
-    targetId: Id<"widgets">,
-  ) {
+  function reorderWidgets(draggedId: Id<"widgets">, targetId: Id<"widgets">) {
     if (draggedId === targetId) return;
     setWidgetOrder((current) => {
       const all = [
@@ -728,14 +724,17 @@ function Library({
                   }
                 }}
                 onDragLeave={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node))
+                  if (
+                    !event.currentTarget.contains(event.relatedTarget as Node)
+                  )
                     setDropTargetId((current) =>
                       current === widget._id ? null : current,
                     );
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
-                  if (draggingWidgetId) reorderWidgets(draggingWidgetId, widget._id);
+                  if (draggingWidgetId)
+                    reorderWidgets(draggingWidgetId, widget._id);
                   setDropTargetId(null);
                 }}
                 onDragEnd={() => {
@@ -949,9 +948,7 @@ function PictureInPictureWidget({ widget }: { widget: Doc<"widgets"> }) {
     const aspectRatio = widget.definition.size === "rectangle" ? 2 : 1;
     const updateWidth = () => {
       const naturalWidth = Number.parseFloat(
-        pip
-          .getComputedStyle(node)
-          .getPropertyValue("--pip-widget-width"),
+        pip.getComputedStyle(node).getPropertyValue("--pip-widget-width"),
       );
       setWidth(
         Math.min(
@@ -1074,12 +1071,27 @@ function SourceView({
   const source = useQuery(api.sources.get, { sourceId });
   const existingWidgetId = useQuery(api.widgets.forSource, { sourceId });
   const retry = useMutation(api.sources.retry);
+  const remove = useMutation(api.sources.remove);
   const [candidate, setCandidate] = useState<WidgetDefinitionV1 | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!candidate && existingWidgetId) onWidget(existingWidgetId);
   }, [candidate, existingWidgetId, onWidget]);
   if (!source) return <Loading />;
+  const sourceTitle = source.title;
+  async function deleteGeneration() {
+    if (!confirmGenerationDeletion(sourceTitle)) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await remove({ sourceId });
+      onDeleted();
+    } catch (err) {
+      setError(errorMessage(err));
+      setDeleting(false);
+    }
+  }
   if (candidate)
     return (
       <WidgetEditor
@@ -1176,8 +1188,27 @@ function SourceView({
           <h1>Choose a design</h1>
           <p>{source.fields.length} fields found · Customize after choosing</p>
         </div>
-        <span className="connected-pill">{new URL(source.url).hostname}</span>
+        <button
+          className="danger-button delete-generation"
+          disabled={deleting}
+          onClick={() => void deleteGeneration()}
+        >
+          {deleting ? (
+            <LoaderCircle size={16} className="spin" />
+          ) : (
+            <Trash2 size={16} />
+          )}
+          {deleting ? "Deleting…" : "Delete"}
+        </button>
       </div>
+      {error && (
+        <div className="alert" role="alert">
+          {error}
+          <button className="text-button" onClick={() => setError(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
       <div className="candidate-grid">
         {source.candidates.map((definition) => (
           <div className="candidate-card" key={definition.size}>

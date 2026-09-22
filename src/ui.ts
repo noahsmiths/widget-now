@@ -13,6 +13,11 @@ export function confirmWidgetDeletion(name: string) {
     `Delete “${name}”? This permanently deletes the widget and its generation.`,
   );
 }
+export function confirmGenerationDeletion(name: string) {
+  return window.confirm(
+    `Delete “${name}”? This permanently deletes this generation and both designs.`,
+  );
+}
 export function timeLabel(timestamp: number | null) {
   return timestamp === null
     ? "Not yet"

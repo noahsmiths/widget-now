@@ -30,7 +30,7 @@ Existing password and GitHub sign-in remain supported. GitHub redirect origins a
 1. An authenticated mutation validates the URL, creates an owner-scoped source, and starts a durable workflow.
 2. The Firecrawl component reads that single page as fresh markdown.
 3. The first structured OpenAI call extracts labeled scalar fields, stable IDs, units, and supporting source excerpts.
-4. A separate call suggests exactly one Square and one Rectangle. Live elements bind to field IDs; headings are literal text.
+4. A separate call suggests exactly one Square and one Rectangle using a size-aware widget design brief: concise subject titles, one clear live-data hierarchy, disciplined palette pairing, safe-area spacing, constrained element counts, and background-first layering. Live elements bind to field IDs; headings are literal text.
 5. The editor presents every extracted field, including unused ones. Drag fields onto the canvas or use Add. Move and resize elements, edit text and typography, change themes, add icons and shapes, arrange layers, and undo/redo.
 6. Save writes only the widget name and presentation definition. Source values are read-only. Revision checks prevent conflicting saves.
 
@@ -54,7 +54,7 @@ Fonts and radii use reference canvas units. The renderer uniformly scales the ca
 
 Sources separately store field descriptions, labels, types, units, current values, source evidence, stale flags, and observation timestamps. Widgets reference sources, so multiple saved designs from one generation share one refreshed dataset. Every public source/widget operation derives the user from the authenticated session and checks ownership.
 
-Initial generation captures a viewport screenshot with the page scrape, derives a six-color widget palette from it, and uses that palette for both size candidates. Refreshes only update live data and retain the saved widget designs.
+Initial generation captures a viewport screenshot with the page scrape, derives a restrained six-color widget palette from it, repairs any low-contrast foreground pairs, and uses that palette for both size candidates. Generation constrains candidates to glanceable iOS-scale typography and a small number of intentional elements, then orders shapes behind content before validation. Refreshes only update live data and retain the saved widget designs.
 
 ## Live refresh
 

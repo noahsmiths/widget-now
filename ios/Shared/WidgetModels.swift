@@ -101,6 +101,7 @@ enum ScalarValue: Decodable {
             text = formatter.string(from: NSNumber(value: value)) ?? String(value)
         }
         guard showUnit && !unit.isEmpty else { return text }
+        if ["$", "€", "£", "¥", "₹", "₩"].contains(unit) { return unit + text }
         return text + ((unit.hasPrefix("°") || unit == "%") ? "" : " ") + unit
     }
 }

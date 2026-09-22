@@ -139,12 +139,10 @@ export function formatValue(
           ? "Yes"
           : "No"
         : field.value;
-  return (
-    value +
-    (showUnit && field.unit
-      ? `${field.unit.startsWith("°") || field.unit === "%" ? "" : " "}${field.unit}`
-      : "")
-  );
+  if (!showUnit || !field.unit) return value;
+  if (["$", "€", "£", "¥", "₹", "₩"].includes(field.unit))
+    return `${field.unit}${value}`;
+  return `${value}${field.unit.startsWith("°") || field.unit === "%" ? "" : " "}${field.unit}`;
 }
 
 export function clampFrame(frame: WidgetElement["frame"]) {
