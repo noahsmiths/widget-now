@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5-mini via the OpenAI provider
 - **Started:** 2026-09-11T22:30:53Z
-- **Last updated:** 2026-09-22T06:44:02Z
+- **Last updated:** 2026-09-22T07:08:18Z
 
 ## Log
 
@@ -112,3 +112,9 @@ the app and extension's shared Convex session with serialized cross-process toke
 access-token reuse, foreground reauthentication, and timeline reloads (`convex/mobile.ts`,
 `ios/WidgetExtension/WidgetNowWidgets.swift`, `ios/App/WidgetNowApp.swift`,
 `ios/Shared/AccountSession.swift`).
+
+### 2026-09-22 - 4302156
+Reframed the public project documentation around turning webpages into live widgets and mapped the
+full generation, scheduled-refresh, and email-reply flow across Convex, Firecrawl, OpenAI, and
+AgentMail. Clarified that mail delivery uses the AgentMail Node SDK rather than a registered Convex
+component (`README.md`).
