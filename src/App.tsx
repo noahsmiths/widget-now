@@ -1269,7 +1269,7 @@ function Loading() {
   return (
     <div className="loading">
       <LoaderCircle size={24} className="spin" />
-      <span>Loading your world…</span>
+      <span>Loading...</span>
     </div>
   );
 }
