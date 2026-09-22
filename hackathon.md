@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5-mini via the OpenAI provider
 - **Started:** 2026-09-11T22:30:53Z
-- **Last updated:** 2026-09-22T07:08:18Z
+- **Last updated:** 2026-09-22T16:20:09Z
 
 ## Log
 
@@ -118,3 +118,8 @@ Reframed the public project documentation around turning webpages into live widg
 full generation, scheduled-refresh, and email-reply flow across Convex, Firecrawl, OpenAI, and
 AgentMail. Clarified that mail delivery uses the AgentMail Node SDK rather than a registered Convex
 component (`README.md`).
+
+### 2026-09-22 - eb86dfd
+Polished release behavior by launching the shared iOS app scheme with its Release configuration,
+then simplified the browser title and loading message for the public web app
+(`ios/WidgetNow.xcodeproj/xcshareddata/xcschemes/WidgetNow.xcscheme`, `index.html`, `src/App.tsx`).
