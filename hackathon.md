@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5-mini via the OpenAI provider
 - **Started:** 2026-09-11T22:30:53Z
-- **Last updated:** 2026-09-22T04:27:59Z
+- **Last updated:** 2026-09-22T06:44:02Z
 
 ## Log
 
@@ -104,3 +104,11 @@ measurement, so the AI chooses hierarchy and position while the backend derives 
 boxes for square and rectangle designs. Replaced browser drag ghosts with live cursor and canvas
 placement previews, added save-state feedback, and allowed manual refreshes before a widget is
 saved (`convex/pipeline.ts`, `convex/sources.ts`, `src/WidgetEditor.tsx`, `src/editorState.ts`).
+
+### 2026-09-22 - 329df61
+Made configured iOS widgets open their original source pages by returning the owner-scoped source
+URL from the Convex mobile query and forwarding WidgetKit taps through the companion app. Hardened
+the app and extension's shared Convex session with serialized cross-process token refreshes,
+access-token reuse, foreground reauthentication, and timeline reloads (`convex/mobile.ts`,
+`ios/WidgetExtension/WidgetNowWidgets.swift`, `ios/App/WidgetNowApp.swift`,
+`ios/Shared/AccountSession.swift`).
